@@ -200,8 +200,8 @@
   .titleText small { display: block; font-size: calc(var(--u) * 4); letter-spacing: .3em; color: var(--muted); margin-top: calc(var(--u) * 1.5); }
   .subtitle { font-size: calc(var(--u) * 4.4); font-weight: 700; margin-top: calc(var(--u) * 4); color: var(--accent); }
   .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.4); margin-top: calc(var(--u) * 5); }
-  .chips div { display: flex; align-items: center; gap: calc(var(--u) * 1); padding: .calc(var(--u) * 8) calc(var(--u) * 2) .calc(var(--u) * 8) .calc(var(--u) * 8); border-radius: calc(var(--u) * 1.2); background: var(--panel); font-size: calc(var(--u) * 2.8); font-weight: 700; }
-  .chips b { width: calc(var(--u) * 5); height: calc(var(--u) * 5); border-radius: .calc(var(--u) * 9); display: flex; align-items: center; justify-content: center; color: #fff; font-size: calc(var(--u) * 3.2); }
+  .chips div { display: flex; align-items: center; gap: calc(var(--u) * 1); padding: calc(var(--u) * .8) calc(var(--u) * 2) calc(var(--u) * .8) calc(var(--u) * .8); border-radius: calc(var(--u) * 1.2); background: var(--panel); font-size: calc(var(--u) * 2.8); font-weight: 700; }
+  .chips b { width: calc(var(--u) * 5); height: calc(var(--u) * 5); border-radius: calc(var(--u) * .9); display: flex; align-items: center; justify-content: center; color: #fff; font-size: calc(var(--u) * 3.2); }
   .slideTitle { font-size: calc(var(--u) * 7); font-weight: 900; margin-bottom: calc(var(--u) * 4); }
   .slideTitle em { font-style: normal; color: var(--accent); }
   .points { list-style: none; padding: 0; margin: 0; text-align: left; font-size: calc(var(--u) * 4.2); font-weight: 700; line-height: 1.5; }
@@ -507,6 +507,12 @@
   .fPhoto { background: #fff; padding: calc(var(--u) * .7) calc(var(--u) * .7) calc(var(--u) * 2); border: calc(var(--u) * .35) dotted #ff6fb5; text-align: center; }
   .fPhoto img { display: block; width: calc(var(--u) * 9.5); height: calc(var(--u) * 9.5); object-fit: cover; }
   .fPhoto span { display: block; font-family: var(--pop); font-size: calc(var(--u) * 1.5); color: #ff3d9a; line-height: 1.3; }
+
+  /* 3Dのタイトル画面（平成モードで three.js が使えるとき）。ロゴ・帯・集中線は 3D で描くので隠す */
+  #t3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; display: none; }
+  body.t3d::before, body.t3d::after { display: none; }
+  body.t3d .flow, body.t3d #intro .logo, body.t3d .titleText { display: none; }
+  body.heisei.title.t3d #intro { justify-content: flex-end; padding-bottom: calc(var(--u) * 3); }
 
   /* ルール説明 */
   body.heisei .points { background: rgba(0, 0, 40, .55); border: .5vh ridge #ffee00; padding: 2vh 3vw; color: #fff; }
@@ -1269,6 +1275,37 @@
     }
   }
 
+  // ---- 3Dのタイトル画面 ----
+  // three.js（vendor/three.js）と title3d.js は、平成モードのタイトル画面を開いたときだけ読み込む。
+  // 読み込めない・WebGL が使えないときは、上の流れる帯のタイトル画面のまま
+  let title3dLoad = null, title3dFailed = false;
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = h('script', { src });
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.append(s);
+    });
+  }
+  const title3dOpts = () => ({ title: 'アタック25', art: HS_ART, logos: HS_LOGOS, photos: titlePhotos, photoVer: titlePhotosVer, lite: VIEW === 'operator' });
+  function syncTitle3d() {
+    const want = state.phase === 'title' && state.heisei !== false && !title3dFailed;
+    if (!want) {
+      document.body.classList.remove('t3d');
+      if (window.Title3D) window.Title3D.stop();
+      return;
+    }
+    document.body.classList.add('t3d');
+    if (!title3dLoad) title3dLoad = loadScript('vendor/three.js').then(() => loadScript('title3d.js'));
+    title3dLoad.then(() => {
+      if (state.phase !== 'title' || state.heisei === false) return;
+      if (!window.Title3D.start(title3dOpts())) throw new Error('WebGL が使えない');
+    }).catch(() => {
+      title3dFailed = true;
+      document.body.classList.remove('t3d');
+    });
+  }
+
   function fmt(ms) {
     const s = Math.ceil(ms / 1000);
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -1344,6 +1381,7 @@
     // 同じスライドの再描画ではアニメーションを止めない
     const key = intro ? `${state.phase}:${state.slide}:${state.subtitle}:${state.heisei !== false}:${titlePhotosVer}:${state.drawSet.join(',')}:${state.teams.map(t => t.name).join('|')}` : null;
     if (key !== introKey) { introKey = key; renderIntro(); }
+    syncTitle3d();
     renderHeader();
     renderBoard();
     renderDraw();
