@@ -281,6 +281,8 @@
   const REVEAL_STEP_MS = 110;
   const KEY = 'a36-state';
   const PHOTO_KEY = 'a36-photo';
+  const UNDO_KEY = 'a36-undo';
+  const UNDO_MAX = 200;
   const VIEW = new URLSearchParams(location.search).get('view') === 'screen' ? 'screen' : 'operator';
   const DIRS = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
 
@@ -324,14 +326,27 @@
   }
 
   let state = load() || initialState();
+  // 開き直した直後に期限切れのランダム配置が走らないよう、選択タイマーは止めた状態で再開する
+  if (VIEW === 'operator' && state.pick && state.pick.deadline) {
+    const left = state.pick.deadline - Date.now();
+    state.pick = { deadline: null, pausedLeft: left > 1000 ? left : PICK_MS };
+  }
   let photoUrl = loadPhoto();
-  let undoStack = [];
+  // 1手戻す履歴も保存し、ページを開き直しても戻せるようにする
+  let undoStack = (() => {
+    try { const u = JSON.parse(localStorage.getItem(UNDO_KEY)); return Array.isArray(u) ? u : []; }
+    catch (e) { return []; }
+  })();
+  function saveUndo() {
+    try { localStorage.setItem(UNDO_KEY, JSON.stringify(undoStack)); } catch (e) {}
+  }
 
   function commit(fn) {
     undoStack.push(JSON.stringify(state));
-    if (undoStack.length > 300) undoStack.shift();
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
     fn();
     save();
+    saveUndo();
     render();
   }
 
@@ -343,6 +358,7 @@
     state.last = null;
     if (state.pick) state.pick = { deadline: null, pausedLeft: PICK_MS };
     save();
+    saveUndo();
     render();
   }
 
@@ -450,8 +466,19 @@
     });
   }
 
+  // 誤答はもう一度押すと取り消せる
   function wrong(t) {
-    commit(() => { if (!state.wrong.includes(t)) state.wrong.push(t); });
+    commit(() => {
+      state.wrong = state.wrong.includes(t) ? state.wrong.filter(x => x !== t) : [...state.wrong, t];
+    });
+  }
+
+  function cancelCorrect() {
+    commit(() => {
+      state.phase = 'answer';
+      state.placing = null;
+      state.pick = null;
+    });
   }
 
   function place(cell) {
@@ -684,13 +711,14 @@
 
       const zeroTeams = counts().map((n, t) => n === 0 ? t : -1).filter(t => t >= 0);
       state.teams.forEach((tm, t) => {
-        const blocked = (!attack && !state.rescue && state.resting.includes(t)) || state.wrong.includes(t)
+        const isWrong = state.wrong.includes(t);
+        const blocked = (!attack && !state.rescue && state.resting.includes(t))
           || (state.rescue && !zeroTeams.includes(t));
         tb.append(h('div', { class: 'tb', style: `border-top-color:${COLORS[t].bg}` },
           h('div', { class: 'tn' }, `${t + 1} ${tm.name}`),
           h('div', { class: 'row' },
-            h('button', { class: 'ok', disabled: blocked, onclick: () => correct(t) }, '正解'),
-            h('button', { class: 'ng', disabled: blocked, onclick: () => wrong(t) }, '誤答'))));
+            h('button', { class: 'ok', disabled: blocked || isWrong, onclick: () => correct(t) }, '正解'),
+            h('button', { class: isWrong ? 'ghost' : 'ng', disabled: blocked, onclick: () => wrong(t) }, isWrong ? '誤答を取消' : '誤答'))));
       });
       gb.append(h('button', { class: 'primary', onclick: () => commit(nextQuestion) }, state.rescue ? '救済問題を終える' : '流す（次の問題へ）'));
       if (!state.rescue && !attack) {
@@ -711,6 +739,9 @@
       const t = state.placing.team;
       status.textContent = `${t + 1} ${state.teams[t].name}：チームが言ったマスを盤面でクリック（あと${state.placing.left}枚）。10秒過ぎると自動でランダムに置きます`;
       gb.append(h('button', { onclick: togglePickTimer }, state.pick && state.pick.deadline ? '選択タイマーを止める' : '選択タイマーを再開'));
+      if (state.placing.left === state.placing.total) {
+        gb.append(h('button', { class: 'ng', onclick: cancelCorrect }, '正解を取り消す（押し間違い）'));
+      }
     } else if (p === 'remove') {
       const t = state.removing.team;
       status.textContent = `${t + 1} ${state.teams[t].name}：空きマスに戻す他チームのパネルを盤面でクリック`;
@@ -919,6 +950,7 @@
     const { teams, hardSet, subtitle } = state;
     state = { ...initialState(), teams, hardSet, subtitle };
     undoStack = [];
+    saveUndo();
     shown.length = 0;
     save();
     render();
