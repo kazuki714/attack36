@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>アタック36</title>
+<title>アタック25</title>
 <style>
   :root {
     --bg: #0f1530;
@@ -43,6 +43,7 @@
   #badge { padding: .4vh 1.2vw; border-radius: 1vh; font-size: 3vh; display: none; }
   #badge.hard { display: inline-block; background: #ff8a3d; color: #1b1000; }
   #badge.easy { display: inline-block; background: #8fb3ff; color: #06163a; }
+  #badge.draw { display: inline-block; background: #c58bff; color: #1e0636; }
   #badge.attack { display: inline-block; background: #e8164a; color: #fff; animation: blink 1s steps(2) infinite; }
   #badge.rescue { display: inline-block; background: #3dbb8a; color: #002014; }
   @keyframes blink { 50% { filter: brightness(1.5); } }
@@ -67,8 +68,8 @@
     position: absolute;
     inset: 0;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    grid-template-rows: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: repeat(5, minmax(0, 1fr));
     gap: .9cqh;
     padding: .9cqh;
     border-radius: 1.8cqh;
@@ -86,9 +87,9 @@
     transition: opacity .45s ease, transform .45s ease, background-color .2s;
     user-select: none;
   }
-  .cell .big { font-size: 7cqh; line-height: 1; font-weight: 900; color: var(--empty-ink); }
-  .cell .small { position: absolute; top: .6cqh; left: 1cqh; font-size: 2.4cqh; font-weight: 800; color: rgba(255,255,255,.8); }
-  .cell.owned .big { color: #fff; font-size: 8cqh; text-shadow: 0 .25vh .8vh rgba(0,0,0,.5); }
+  .cell .big { font-size: 8.5cqh; line-height: 1; font-weight: 900; color: var(--empty-ink); }
+  .cell .small { position: absolute; top: .8cqh; left: 1.2cqh; font-size: 2.8cqh; font-weight: 800; color: rgba(255,255,255,.8); }
+  .cell.owned .big { color: #fff; font-size: 10cqh; text-shadow: 0 .25vh .8vh rgba(0,0,0,.5); }
   .cell.legal { background: var(--legal); box-shadow: inset 0 0 0 1.1cqh var(--accent); animation: pulse .8s ease-in-out infinite alternate; }
   .cell.legal .big { color: #7a5a00; }
   .cell.target { box-shadow: inset 0 0 0 .7cqh #fff; animation: pulse .8s ease-in-out infinite alternate; }
@@ -100,6 +101,23 @@
   @keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.12); } }
   @keyframes flip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
   @keyframes pop { 0% { transform: scale(.3); } 70% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  /* カード抽選（盤面の上に重ねて表示） */
+  #drawStage { position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 3cqh; border-radius: 1.8cqh; background: rgba(10, 14, 36, .94); }
+  body.drawing #drawStage { display: flex; }
+  #drawStage .drawTitle { font-size: 7cqh; font-weight: 900; letter-spacing: .08em; }
+  #drawStage .drawCards { display: grid; grid-template-columns: repeat(3, auto); gap: 3cqh 4cqh; }
+  .dcard { width: 22cqh; height: 30cqh; border-radius: 2cqh; transition: opacity .3s, transform .2s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2cqh; box-shadow: 0 1.5cqh 4cqh rgba(0,0,0,.45); }
+  .dcard.back { background: repeating-linear-gradient(45deg, #2b3a8c 0 2.2cqh, #23307a 2.2cqh 4.4cqh); border: .8cqh solid #f5f3ee; }
+  .dcard.back b { font-size: 12cqh; color: rgba(255,255,255,.85); }
+  body.operator .dcard.back.pickable { cursor: pointer; }
+  body.operator .dcard.back.pickable:hover { transform: translateY(-1cqh); }
+  .dcard.dim { opacity: .3; }
+  .dcard.face { border: .8cqh solid #fff; color: #fff; text-shadow: 0 .4cqh 1.2cqh rgba(0,0,0,.45); }
+  .dcard.face b { font-size: 15cqh; line-height: 1; }
+  .dcard.face span { font-size: 3cqh; font-weight: 800; max-width: 90%; text-align: center; }
+  .dcard.flip { animation: cardFlip .6s ease-out; }
+  @keyframes cardFlip { 0% { transform: rotateY(90deg) scale(.9); } 60% { transform: rotateY(0) scale(1.06); } 100% { transform: rotateY(0) scale(1); } }
+  #drawStage .drawNote { font-size: 3.6cqh; font-weight: 700; color: var(--accent); }
   #noPhoto { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 3vh; color: var(--muted); }
 
   #teams { width: 26vw; display: flex; flex-direction: column; gap: 1vh; min-height: 0; }
@@ -230,9 +248,272 @@
   #photoPreview { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; display: none; margin-top: 8px; }
   .dlgBtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
   .note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  /* ============================================================
+     平成モード（設定で切り替え）
+     バラエティ番組のテロップ × 個人ホームページ × Windows 98
+     ============================================================ */
+  body.heisei {
+    --pop: "HG創英角ポップ体", "HGSoeiKakupoptai", "HGP創英角ﾎﾟｯﾌﾟ体", "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4", "Arial Rounded MT Bold", sans-serif;
+    --msp: "MS PGothic", "ＭＳ Ｐゴシック", "Osaka", "Hiragino Kaku Gothic ProN", sans-serif;
+    --empty: #fffdf2;
+    --empty-ink: #5a4a8a;
+    --legal: #fff36b;
+    --accent: #ffee00;
+    font-family: var(--pop);
+    background: #12005e;
+    padding-top: 4.4vh;
+  }
+  /* 回転する集中線 */
+  body.heisei::before {
+    content: "";
+    position: fixed;
+    left: 50%; top: 50%;
+    width: 300vmax; height: 300vmax;
+    margin: -150vmax 0 0 -150vmax;
+    z-index: -2;
+    background: repeating-conic-gradient(#2a0fa8 0deg 7.5deg, #1b0473 7.5deg 15deg);
+    animation: heiseiSpin 80s linear infinite;
+  }
+  /* キラキラの星をちりばめる */
+  body.heisei::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 50% 50%, transparent 30%, rgba(8, 0, 40, .55) 100%),
+      radial-gradient(2px 2px at 12% 18%, #fff, transparent),
+      radial-gradient(2px 2px at 78% 12%, #fff, transparent),
+      radial-gradient(3px 3px at 35% 82%, #ffe96b, transparent),
+      radial-gradient(2px 2px at 88% 66%, #fff, transparent),
+      radial-gradient(3px 3px at 60% 30%, #ff9df2, transparent),
+      radial-gradient(2px 2px at 22% 55%, #9df4ff, transparent);
+    animation: heiseiTwinkle 2.4s steps(2) infinite;
+  }
+  @keyframes heiseiSpin { to { transform: rotate(360deg); } }
+  @keyframes heiseiTwinkle { 50% { opacity: .55; } }
+  @keyframes heiseiRainbow { to { filter: hue-rotate(360deg); } }
+  @keyframes heiseiBoyon { 0%, 100% { transform: rotate(-4deg) scale(1); } 50% { transform: rotate(-4deg) scale(1.12); } }
+
+  /* 流れるテロップ（電光掲示板） */
+  #ticker { display: none; }
+  body.heisei #ticker {
+    display: block;
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 4.4vh;
+    overflow: hidden;
+    background: repeating-linear-gradient(90deg, #000 0 2px, #0a0a0a 2px 4px);
+    border-bottom: .35vh solid #ff3ca0;
+    box-shadow: 0 .3vh 0 #ffee00;
+    z-index: 20;
+  }
+  #ticker span {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%;
+    line-height: 4.4vh;
+    font-family: var(--msp);
+    font-size: 2.6vh;
+    font-weight: 700;
+    color: #ff9a1f;
+    text-shadow: 0 0 .6vh #ff6a00;
+    animation: heiseiMarquee 28s linear infinite;
+  }
+  @keyframes heiseiMarquee { to { transform: translateX(-100%); } }
+
+  /* テロップ文字（黄色グラデ＋黒フチ＋白フチ） */
+  body.heisei #qLabel,
+  body.heisei .titleText,
+  body.heisei .slideTitle,
+  body.heisei #drawStage .drawTitle {
+    font-family: var(--pop);
+    color: #ffe400;
+    -webkit-text-stroke: .1em #2b0057;
+    paint-order: stroke fill;
+    text-shadow: .06em .06em 0 #fff, .1em .1em 0 #2b0057, .12em .12em .1em rgba(0,0,0,.4);
+  }
+  body.heisei #qLabel { font-size: 4.2vh; }
+  body.heisei .slideTitle em { color: #ff6ad5; }
+
+  /* バッジは「ステッカー」風にボヨンボヨン */
+  body.heisei #badge {
+    font-family: var(--pop);
+    border: .4vh solid #fff;
+    border-radius: 999px;
+    box-shadow: 0 0 0 .45vh #e60033, .3vh .5vh 0 .45vh rgba(0,0,0,.4);
+    animation: heiseiBoyon .9s ease-in-out infinite;
+  }
+  body.heisei #badge.hard { background: radial-gradient(circle at 35% 30%, #fff6a8, #ff8a00); color: #c4001d; }
+  body.heisei #badge.easy { background: radial-gradient(circle at 35% 30%, #d8f4ff, #3aa2ff); color: #fff; text-shadow: 0 0 .3vh #003b8a, 0 0 .3vh #003b8a; }
+  body.heisei #badge.draw { background: radial-gradient(circle at 35% 30%, #ffe0ff, #e05bff); color: #fff; text-shadow: 0 0 .3vh #5a007a, 0 0 .3vh #5a007a; }
+  body.heisei #badge.attack { background: radial-gradient(circle at 35% 30%, #ff9ab0, #ff0040); animation: heiseiBoyon .5s ease-in-out infinite, heiseiRainbow 1.5s linear infinite; }
+  body.heisei #badge.rescue { background: radial-gradient(circle at 35% 30%, #d9ffd9, #20c060); color: #fff; }
+  body.heisei #badge::before { content: "★"; margin-right: .3em; }
+  body.heisei #badge::after { content: "★"; margin-left: .3em; }
+
+  /* タイマーは液晶デジタル */
+  body.heisei #mainTimer {
+    font-family: "Courier New", var(--msp);
+    color: #39ff14;
+    background: #001400;
+    border: .3vh inset #6f6f6f;
+    padding: .2vh 1.2vw;
+    text-shadow: 0 0 .8vh #39ff14;
+  }
+  body.heisei #mainTimer.warn { color: #ff3030; text-shadow: 0 0 .8vh #ff3030; animation: blink .6s steps(2) infinite; }
+  body.heisei #pickInfo { color: #fff; text-shadow: .2vh .2vh 0 #e6007a, -.1vh -.1vh 0 #e6007a, .1vh -.1vh 0 #e6007a, -.1vh .1vh 0 #e6007a; }
+  body.heisei #pickInfo::before { content: "☆彡 "; color: #ffee00; }
+  body.heisei #pickInfo:empty::before { content: none; }
+  body.heisei #pickSec { color: #ffee00; }
+
+  /* 盤面：ツヤツヤのパネル */
+  body.heisei #board {
+    background-color: #fff;
+    box-shadow: 0 0 0 .6cqh #ff3ca0, 0 0 0 1.2cqh #ffee00, 0 0 0 1.8cqh #00c8ff, 0 1.5cqh 3cqh 1.8cqh rgba(0,0,0,.5);
+  }
+  body.heisei .cell {
+    background: linear-gradient(180deg, #ffffff 0%, var(--empty) 55%, #e8e0ff 100%);
+    box-shadow: inset 0 -.8cqh 0 rgba(90, 60, 160, .18);
+    font-family: var(--pop);
+  }
+  body.heisei .cell.owned { background-image: linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.18)); box-shadow: inset 0 -1.2cqh 0 rgba(0,0,0,.25), inset 0 0 0 .5cqh rgba(255,255,255,.35); }
+  body.heisei .cell.owned::before {
+    content: "";
+    position: absolute;
+    left: 7%; right: 7%; top: 5%; height: 42%;
+    border-radius: 1cqh 1cqh 50% 50% / 1cqh 1cqh 30% 30%;
+    background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.08));
+    pointer-events: none;
+  }
+  body.heisei .cell.owned .big {
+    position: relative;
+    text-shadow: .5cqh .5cqh 0 #000, -.3cqh -.3cqh 0 #000, .3cqh -.3cqh 0 #000, -.3cqh .3cqh 0 #000, .3cqh .3cqh 0 #000;
+  }
+  body.heisei .cell.legal { background: linear-gradient(180deg, #fffde0, var(--legal)); box-shadow: inset 0 0 0 1.1cqh #ff3ca0; }
+  body.heisei .cell.legal .big { color: #e6007a; }
+  body.heisei .cell.legal::before { content: "ココ!"; position: absolute; top: .6cqh; right: 1cqh; font-size: 2.4cqh; color: #e6007a; animation: blink .5s steps(2) infinite; }
+  body.heisei.revealing #board { animation: heiseiRainbow 2s linear infinite; }
+
+  /* 得点欄：Windows 98 のウィンドウ */
+  body.heisei .team {
+    background: #c0c0c0;
+    color: #000;
+    border-radius: 0;
+    border: .35vh outset #fff;
+    font-family: var(--msp);
+  }
+  body.heisei .team .name {
+    align-self: stretch;
+    display: flex; flex-direction: column; justify-content: center;
+    margin: .5vh 0;
+    padding: 0 .8vw;
+    background: linear-gradient(90deg, #000080, #1084d0);
+    color: #fff;
+    font-weight: 700;
+  }
+  body.heisei .team .tags { color: #ffee00; }
+  body.heisei .team .count {
+    font-family: "Courier New", var(--msp);
+    color: #39ff14;
+    background: #001400;
+    border: .3vh inset #808080;
+    padding: 0 .6vw;
+    text-shadow: 0 0 .8vh #39ff14;
+  }
+  body.heisei .team .count small { color: #39ff14; }
+  body.heisei .team.active { box-shadow: 0 0 0 .5vh #ff3ca0, 0 0 2vh .5vh #ffee00; animation: blink .8s steps(2) infinite; }
+  body.heisei .team.winner { box-shadow: 0 0 0 .6vh #ffee00, 0 0 3vh 1vh #ff3ca0; animation: heiseiRainbow 2s linear infinite; }
+
+  /* 操作パネル：Windows 98 のボタン */
+  body.heisei #ops { background: #c0c0c0; color: #000; border-top: .4vh outset #fff; font-family: var(--msp); }
+  body.heisei #status { color: #000080; }
+  body.heisei #status::before { content: "(・∀・) "; }
+  body.heisei .tb { background: #c0c0c0; border: 2px outset #fff; border-top: 6px solid; border-radius: 0; color: #000; }
+  body.heisei button {
+    font-family: var(--msp);
+    background: #c0c0c0;
+    color: #000;
+    border: 2px outset #fff;
+    border-radius: 0;
+    box-shadow: 1px 1px 0 #000;
+  }
+  body.heisei button:active:not(:disabled) { border-style: inset; }
+  body.heisei button.ok { background: #c0c0c0; color: #006400; }
+  body.heisei button.ng { background: #c0c0c0; color: #b00000; }
+  body.heisei button.primary { background: #000080; color: #fff; }
+  body.heisei button.ghost { background: #c0c0c0; border: 2px outset #fff; }
+  body.heisei #showOps { opacity: .7; }
+
+  /* 設定：Windows 98 のダイアログ */
+  body.heisei dialog { background: #c0c0c0; color: #000; border: 2px outset #fff; border-radius: 0; padding: 0 16px 16px; font-family: var(--msp); }
+  body.heisei dialog h2 { margin: 0 -16px 12px; padding: 4px 8px; background: linear-gradient(90deg, #000080, #1084d0); color: #fff; font-size: 14px; }
+  body.heisei dialog h2::after { content: "_ □ ×"; float: right; letter-spacing: .4em; }
+  body.heisei dialog label { color: #000; }
+  body.heisei dialog input[type=text] { background: #fff; color: #000; border: 2px inset #fff; border-radius: 0; }
+  body.heisei .note { color: #333; }
+
+  /* タイトル画面 */
+  body.heisei .titleText { font-size: 16vh; }
+  body.heisei .titleText small {
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+    background: linear-gradient(90deg, #ff004c, #ff9a00, #ffee00, #2bff5a, #00c8ff, #b45bff, #ff004c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: heiseiRainbow 3s linear infinite;
+  }
+  body.heisei .subtitle { color: #fff; text-shadow: 0 0 1vh #ff3ca0, 0 0 2vh #ff3ca0; font-size: 5vh; }
+  body.heisei .subtitle::before { content: "☆★彡 "; color: #ffee00; }
+  body.heisei .subtitle::after { content: " ミ★☆"; color: #ffee00; }
+  .kiriban { display: none; }
+  body.heisei .kiriban {
+    display: block;
+    margin-top: 3vh;
+    font-family: var(--msp);
+    font-size: 2.6vh;
+    color: #fff;
+  }
+  body.heisei .kiriban b {
+    display: inline-block;
+    margin: 0 .5vw;
+    padding: 0 .6vw;
+    font-family: "Courier New", monospace;
+    letter-spacing: .3em;
+    color: #ff2a2a;
+    background: #000;
+    border: .3vh inset #888;
+    text-shadow: 0 0 .6vh #ff2a2a;
+  }
+  body.heisei .kiriban em { font-style: normal; color: #ffee00; animation: blink .7s steps(2) infinite; margin-left: .6vw; }
+  body.heisei .chips div { background: #c0c0c0; color: #000; border: .3vh outset #fff; border-radius: 0; font-family: var(--msp); }
+
+  /* ルール説明 */
+  body.heisei .points { background: rgba(0, 0, 40, .55); border: .5vh ridge #ffee00; padding: 2vh 3vw; color: #fff; }
+  body.heisei .points li::before { content: "☆"; background: none; width: auto; height: auto; top: 0; color: #ffee00; }
+  body.heisei .points .hl { color: #ff6ad5; text-shadow: 0 0 .8vh #ff3ca0; }
+
+  /* カード抽選 */
+  body.heisei #drawStage { background: rgba(18, 0, 94, .9); }
+  body.heisei #drawStage .drawTitle::before { content: "★"; }
+  body.heisei #drawStage .drawTitle::after { content: "★"; }
+  body.heisei .dcard.back {
+    background: radial-gradient(circle at 50% 50%, #fff 0 9%, transparent 10%), repeating-conic-gradient(#ff3ca0 0 15deg, #ffb6e1 15deg 30deg);
+    border: .8cqh solid #fff;
+    box-shadow: 0 0 0 .5cqh #e6007a, 0 1.5cqh 4cqh rgba(0,0,0,.45);
+  }
+  body.heisei .dcard.back b { color: #fff; -webkit-text-stroke: .5cqh #e6007a; paint-order: stroke fill; font-family: var(--pop); }
+  body.heisei .dcard.face { box-shadow: 0 0 0 .5cqh #ffee00, 0 0 4cqh 1cqh #fff; font-family: var(--pop); }
+  body.heisei #drawStage .drawNote { color: #fff; text-shadow: 0 0 1vh #ff3ca0; }
+  body.heisei #drawStage .drawNote::before { content: "(*´▽｀*) "; }
+
+  /* マウスのキラキラ */
+  .sparkle { position: fixed; z-index: 100; pointer-events: none; font-size: 22px; line-height: 1; animation: sparkleFall .8s ease-out forwards; }
+  @keyframes sparkleFall { to { transform: translate(var(--dx), 40px) rotate(180deg) scale(.3); opacity: 0; } }
 </style>
 </head>
 <body>
+<div id="ticker"><span></span></div>
 <header>
   <span id="qLabel"></span>
   <span id="badge"></span>
@@ -243,6 +524,7 @@
   <div id="boardWrap">
     <div id="board"></div>
     <div id="noPhoto">写真が設定されていません</div>
+    <div id="drawStage"><div class="drawTitle">カード抽選</div><div class="drawCards"></div><div class="drawNote"></div></div>
   </div>
   <div id="teams"></div>
 </main>
@@ -259,12 +541,15 @@
     <h2>設定</h2>
     <label>タイトル画面に出す一言</label>
     <input type="text" id="subtitleInput" placeholder="例：たろう ＆ はなこ 結婚おめでとう！">
+    <label><input type="checkbox" id="heiseiInput"> 平成モード（集中線・テロップ・キラキラ）</label>
     <label>チーム名（テーブル名）</label>
     <div class="nameGrid" id="nameGrid"></div>
     <label>難問（3枚）にする問題番号</label>
     <input type="text" id="hardInput" placeholder="例：5,9,15,18">
     <label>1枚問題にする問題番号</label>
     <input type="text" id="easyInput" placeholder="例：1,2">
+    <label>カード抽選にする問題番号</label>
+    <input type="text" id="drawInput" placeholder="例：4,8">
     <div class="note">アタックチャンスは12問目で固定です。</div>
     <label>パネル裏の写真</label>
     <input type="file" id="photoInput" accept="image/*">
@@ -290,16 +575,17 @@
     { name: 'オレンジ', bg: '#F57C00' },
     { name: '紫', bg: '#8E44AD' },
   ];
-  const SIZE = 36;
-  const CENTER = [14, 15, 20, 21]; // 15・16・21・22番
+  const N = 5; // 盤面の一辺
+  const SIZE = N * N;
+  const CENTER = [12]; // 中央の13番
   const ATTACK_Q = 12;
   const MAX_Q = 20;
   const MAIN_MS = 20 * 60 * 1000;
   const PICK_MS = 10 * 1000;
   const REVEAL_STEP_MS = 110;
-  const KEY = 'a36-state';
-  const PHOTO_KEY = 'a36-photo';
-  const UNDO_KEY = 'a36-undo';
+  const KEY = 'a25-state';
+  const PHOTO_KEY = 'a25-photo';
+  const UNDO_KEY = 'a25-undo';
   const UNDO_MAX = 200;
   const VIEW = new URLSearchParams(location.search).get('view') === 'screen' ? 'screen' : 'operator';
   const DIRS = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
@@ -309,12 +595,17 @@
     return {
       v: 1,
       subtitle: '',
+      heisei: true, // 平成モード
       slide: 0,
       teams: COLORS.map((c, i) => ({ name: `チーム${i + 1}` })),
       board: Array(SIZE).fill(-1),
       q: 1,
       hardSet: [5, 9, 15, 18],
       easySet: [],
+      drawSet: [4, 8],
+      drawDeck: [],  // カード抽選：伏せた6枚それぞれの中身（チーム番号）。最初にめくるときに混ぜる
+      drawFlips: [], // めくったカードの位置（めくった順）
+      drawPicks: [], // めくって当たったチーム（めくった順）
       rescue: false,
       rescueDone: false,
       resting: [],
@@ -385,26 +676,26 @@
   }
 
   // ---- ルール ----
-  const inb = (r, c) => r >= 0 && r < 6 && c >= 0 && c < 6;
+  const inb = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
   function neighbors(cell) {
-    const r = Math.floor(cell / 6), c = cell % 6, out = [];
-    for (const [dr, dc] of DIRS) if (inb(r + dr, c + dc)) out.push((r + dr) * 6 + c + dc);
+    const r = Math.floor(cell / N), c = cell % N, out = [];
+    for (const [dr, dc] of DIRS) if (inb(r + dr, c + dc)) out.push((r + dr) * N + c + dc);
     return out;
   }
   // cell に team t が置いたとき裏返るマス（8方向同時、混色可、空きマスで不成立、連鎖なし）
   function flipsFor(board, cell, t) {
     if (board[cell] !== -1) return [];
-    const r0 = Math.floor(cell / 6), c0 = cell % 6, out = [];
+    const r0 = Math.floor(cell / N), c0 = cell % N, out = [];
     for (const [dr, dc] of DIRS) {
       let r = r0 + dr, c = c0 + dc;
       const line = [];
       while (inb(r, c)) {
-        const v = board[r * 6 + c];
+        const v = board[r * N + c];
         if (v === -1 || v === t) break;
-        line.push(r * 6 + c);
+        line.push(r * N + c);
         r += dr; c += dc;
       }
-      if (line.length && inb(r, c) && board[r * 6 + c] === t) out.push(...line);
+      if (line.length && inb(r, c) && board[r * N + c] === t) out.push(...line);
     }
     return out;
   }
@@ -422,7 +713,7 @@
     return { cells: any.length ? any : empty, kind: 'any' };
   }
   const RULE_TEXT = {
-    center: '最初の1枚：中央4マスから選びます',
+    center: '最初の1枚：中央の13番に置きます',
     flip: '挟めるマスがあるので、そこに置きます',
     own: '自分の色の隣に置けます',
     any: 'どれかのパネルの隣に置けます',
@@ -436,8 +727,9 @@
   };
   const emptyCount = () => state.board.filter(v => v === -1).length;
   const isAttack = () => !state.rescue && state.q === ATTACK_Q;
-  const isHard = () => !state.rescue && !isAttack() && state.hardSet.includes(state.q);
-  const isEasy = () => !state.rescue && !isAttack() && !isHard() && state.easySet.includes(state.q);
+  const isDraw = () => !state.rescue && !isAttack() && state.drawSet.includes(state.q);
+  const isHard = () => !state.rescue && !isAttack() && !isDraw() && state.hardSet.includes(state.q);
+  const isEasy = () => !state.rescue && !isAttack() && !isDraw() && !isHard() && state.easySet.includes(state.q);
   const freshPick = () => ({ deadline: Date.now() + PICK_MS, pausedLeft: null });
   function mainLeft() {
     const m = state.main;
@@ -455,6 +747,9 @@
   }
 
   function nextQuestion() {
+    state.drawDeck = [];
+    state.drawFlips = [];
+    state.drawPicks = [];
     state.placing = null;
     state.removing = null;
     state.pick = null;
@@ -474,7 +769,7 @@
   }
 
   function finishQuestion() {
-    if (emptyCount() === 0) return endGame('全36マスが埋まりました');
+    if (emptyCount() === 0) return endGame(`全${SIZE}マスが埋まりました`);
     nextQuestion();
   }
 
@@ -504,6 +799,38 @@
     });
   }
 
+  // ---- カード抽選 ----
+  function shuffled(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  // 伏せたカードを1枚めくる（2枚まで）
+  function drawFlip(slot) {
+    if (state.drawFlips.length >= 2 || state.drawFlips.includes(slot)) return;
+    commit(() => {
+      if (state.drawDeck.length !== 6) state.drawDeck = shuffled([0, 1, 2, 3, 4, 5]);
+      state.drawFlips = [...state.drawFlips, slot];
+      state.drawPicks = state.drawFlips.map(i => state.drawDeck[i]);
+    });
+  }
+  function drawRedo() {
+    commit(() => { state.drawDeck = []; state.drawFlips = []; state.drawPicks = []; });
+  }
+  // 引いた順に1枚ずつ置く
+  function startDrawPlacement() {
+    commit(() => {
+      const [first, ...queue] = state.drawPicks;
+      state.phase = 'place';
+      state.placing = { team: first, left: 1, total: 1, attack: false, draw: true, queue };
+      state.pick = freshPick();
+      state.last = null;
+    });
+  }
+
   function place(cell) {
     commit(() => {
       const t = state.placing.team;
@@ -513,6 +840,13 @@
       state.last = { cell, flips };
       state.placing.left--;
       if (state.placing.left > 0 && emptyCount() > 0) {
+        state.pick = freshPick();
+        return;
+      }
+      const queue = state.placing.queue || [];
+      if (queue.length && emptyCount() > 0) {
+        const [next, ...rest] = queue;
+        state.placing = { team: next, left: 1, total: 1, attack: false, draw: true, queue: rest };
         state.pick = freshPick();
         return;
       }
@@ -609,7 +943,7 @@
     }
   }
 
-  const cheb = (a, b) => Math.max(Math.abs(Math.floor(a / 6) - Math.floor(b / 6)), Math.abs(a % 6 - b % 6));
+  const cheb = (a, b) => Math.max(Math.abs(Math.floor(a / N) - Math.floor(b / N)), Math.abs(a % N - b % N));
 
   function renderBoard() {
     const legal = state.phase === 'place' ? new Set(legalInfo(state.board, state.placing.team).cells) : null;
@@ -660,6 +994,7 @@
     if (!ended) {
       if (state.rescue) { badge.className = 'rescue'; badge.textContent = '0枚のチームのみ'; }
       else if (isAttack()) { badge.className = 'attack'; badge.textContent = 'アタックチャンス'; }
+      else if (isDraw()) { badge.className = 'draw'; badge.textContent = 'カード抽選'; }
       else if (isHard()) { badge.className = 'hard'; badge.textContent = '難問・3枚'; }
       else if (isEasy()) { badge.className = 'easy'; badge.textContent = '1枚問題'; }
     }
@@ -690,14 +1025,15 @@
       const tags = [];
       if (ended) tags.push(r[t] === 1 ? '優勝' : `${r[t]}位`);
       else {
-        if (state.resting.includes(t) && !state.rescue && !isAttack()) tags.push('休み');
+        if (state.resting.includes(t) && !state.rescue && !isAttack() && !isDraw()) tags.push('休み');
+        if (isDraw() && state.drawPicks.includes(t)) tags.push(`カード${state.drawPicks.indexOf(t) + 1}枚目`);
         if (state.wrong.includes(t)) tags.push('誤答');
         if (state.placing && state.placing.team === t) tags.push('配置中');
         if (state.removing && state.removing.team === t) tags.push('特典');
       }
       const cls = ['team'];
       if ((state.placing && state.placing.team === t) || (state.removing && state.removing.team === t)) cls.push('active');
-      if (!ended && !state.rescue && !isAttack() && state.resting.includes(t)) cls.push('resting');
+      if (!ended && !state.rescue && !isAttack() && !isDraw() && state.resting.includes(t)) cls.push('resting');
       if (ended && r[t] === 1) cls.push('winner');
       wrap.append(h('div', { class: cls.join(' ') },
         h('div', { class: 'chip', style: `background:${COLORS[t].bg}` }, String(t + 1)),
@@ -726,6 +1062,14 @@
         : 'ルール説明中です。←→キーでも進められます';
       gb.append(h('button', { onclick: () => gotoSlide(state.slide - 1) }, '← 前へ'));
       gb.append(h('button', { class: 'primary', onclick: () => gotoSlide(state.slide + 1) }, last ? '本編スタート（タイマー開始）' : '次へ →'));
+    } else if (p === 'answer' && isDraw()) {
+      const picks = state.drawPicks;
+      status.textContent = picks.length === 0 ? 'カード抽選：新郎新婦が選んだカードを、盤面の上のカードからクリックしてめくってください（2枚）'
+        : picks.length === 1 ? '2枚目に選んだカードをクリックしてめくってください'
+        : '「配置へ進む」で、めくった順に1枚ずつ置きます';
+      gb.append(h('button', { class: 'primary', disabled: picks.length < 2, onclick: startDrawPlacement }, '配置へ進む'));
+      gb.append(h('button', { disabled: !picks.length, onclick: drawRedo }, 'カードを混ぜ直す'));
+      gb.append(h('button', { class: 'ghost', onclick: () => commit(nextQuestion) }, '抽選を飛ばす（次の問題へ）'));
     } else if (p === 'answer') {
       if (state.rescue) status.textContent = '救済問題：0枚のチームだけが答えます。正解なら2枚。終わったら「救済問題を終える」';
       else if (attack) status.textContent = 'アタックチャンス：正解が出るまで解答権を移します。全チーム誤答なら予備問題で出し直し（「流す」は押さない）';
@@ -769,8 +1113,11 @@
       const t = state.placing.team;
       status.textContent = `${t + 1} ${state.teams[t].name}：チームが言ったマスを盤面でクリック（あと${state.placing.left}枚）。10秒過ぎると自動でランダムに置きます`;
       gb.append(h('button', { onclick: togglePickTimer }, state.pick && state.pick.deadline ? '選択タイマーを止める' : '選択タイマーを再開'));
-      if (state.placing.left === state.placing.total) {
+      const firstDraw = state.placing.draw && state.placing.queue.length === state.drawPicks.length - 1;
+      if (!state.placing.draw && state.placing.left === state.placing.total) {
         gb.append(h('button', { class: 'ng', onclick: cancelCorrect }, '正解を取り消す（押し間違い）'));
+      } else if (firstDraw) {
+        gb.append(h('button', { class: 'ng', onclick: cancelCorrect }, '抽選に戻る'));
       }
     } else if (p === 'remove') {
       const t = state.removing.team;
@@ -815,6 +1162,10 @@
     () => [h('div', { class: 'slideTitle' }, '挟むと、裏返る'),
       h('div', { class: 'demo' }, h('div', { class: 'd0' }), h('div', { class: 'd1' }), h('div', { class: 'd2' }), h('div', { class: 'd3' })),
       h('div', { class: 'demoCaption' }, '縦・横・斜め、どの向きでもOK。色が混ざっていてもまとめて裏返ります')],
+    () => [h('div', { class: 'slideTitle' }, state.drawSet.length ? `${state.drawSet.join('・')}問目は ` : '', h('em', {}, 'カード抽選')),
+      points(['伏せた', hl('6枚のカード'), 'から、新郎新婦が2枚選びます'],
+        ['当たったチームは', hl('1枚ずつ'), 'パネルを置ける'],
+        ['お休み中のチームにも', hl('チャンスあり'), '！'])],
     () => [h('div', { class: 'slideTitle' }, '12問目は ', h('em', {}, 'アタックチャンス')),
       points(['正解すると', hl('3枚'), '置いて、さらに', hl('他チームのパネルを1枚消せる')],
         '20問・20分・全マスが埋まる、のどれかで終了',
@@ -827,9 +1178,10 @@
     if (state.phase === 'title') {
       el.append(
         h('div', { class: 'logo' }, ...COLORS.map((c, i) => h('span', { style: `background:${c.bg};animation-delay:${i * 0.08}s` }))),
-        h('div', { class: 'titleText' }, 'アタック36', h('small', {}, 'ATTACK 36')),
+        h('div', { class: 'titleText' }, 'アタック25', h('small', {}, 'ATTACK 25')),
         ...(state.subtitle ? [h('div', { class: 'subtitle' }, state.subtitle)] : []),
-        teamChips());
+        teamChips(),
+        h('div', { class: 'kiriban' }, 'あなたは', h('b', {}, '000025'), '人目のお客様です', h('em', {}, 'キリ番ゲット!!')));
     } else if (state.phase === 'rules') {
       el.append(...SLIDES[state.slide]().filter(Boolean));
     }
@@ -860,16 +1212,58 @@
     }
   }
 
+  // カード抽選の表示。伏せた6枚を並べ、めくったカードだけ中身を見せる
+  let drawShown = null; // 前回描いた各カードの状態（変わったカードだけ描き直し、めくれたときだけ演出する）
+  function renderDraw() {
+    const show = state.phase === 'answer' && isDraw();
+    document.body.classList.toggle('drawing', show);
+    const wrap = document.querySelector('#drawStage .drawCards');
+    if (!show) { wrap.textContent = ''; drawShown = null; return; }
+    const first = drawShown === null;
+    if (first) { wrap.textContent = ''; for (let i = 0; i < 6; i++) wrap.append(h('div')); drawShown = []; }
+    const done = state.drawFlips.length >= 2;
+    for (let i = 0; i < 6; i++) {
+      const order = state.drawFlips.indexOf(i);
+      const t = order >= 0 ? state.drawDeck[i] : null;
+      const key = t === null ? (done ? 'dim' : 'back') : `${t}:${state.teams[t].name}`;
+      if (drawShown[i] === key) continue;
+      const card = t === null
+        ? h('div', { class: 'dcard back' + (done ? ' dim' : ' pickable'), onclick: () => { if (VIEW === 'operator') drawFlip(i); } }, h('b', {}, '?'))
+        : h('div', { class: 'dcard face' + (!first && String(drawShown[i]).startsWith('back') ? ' flip' : ''), style: `background:${COLORS[t].bg}` },
+            h('b', {}, String(t + 1)), h('span', {}, state.teams[t].name));
+      wrap.children[i].replaceWith(card);
+      drawShown[i] = key;
+    }
+    document.querySelector('#drawStage .drawNote').textContent = done
+      ? '当たったチームが1枚ずつ置けます' : '新郎新婦が2枚選びます';
+  }
+
+  // 平成モードの流れるテロップ。文言が変わったときだけ差し替えて、流れが途切れないようにする
+  function tickerText() {
+    const where = state.phase === 'title' ? 'まもなく開始！'
+      : state.phase === 'rules' ? 'ルール説明中'
+      : state.phase === 'ended' || state.phase === 'reveal' ? '結果発表！！'
+      : state.rescue ? '救済問題' : `第${state.q}問`;
+    const msg = state.subtitle || '祝☆ご結婚おめでとうございます';
+    return `★☆★ ${msg} ★☆★ アタック25 ${where} ★☆★ 本日はお越しいただきありがとうございます (^o^)/ ★☆★ 相互リンク募集中!! ★☆★ `;
+  }
+
   let introKey = null;
   function render() {
+    document.body.classList.toggle('heisei', state.heisei !== false);
+    document.body.classList.toggle('revealing', state.phase === 'reveal');
+    const tk = document.querySelector('#ticker span');
+    const tt = tickerText();
+    if (tk.textContent !== tt) tk.textContent = tt;
     const intro = state.phase === 'title' || state.phase === 'rules';
     document.body.classList.toggle('intro', intro);
     document.body.classList.toggle('title', state.phase === 'title');
     // 同じスライドの再描画ではアニメーションを止めない
-    const key = intro ? `${state.phase}:${state.slide}:${state.subtitle}:${state.teams.map(t => t.name).join('|')}` : null;
+    const key = intro ? `${state.phase}:${state.slide}:${state.subtitle}:${state.drawSet.join(',')}:${state.teams.map(t => t.name).join('|')}` : null;
     if (key !== introKey) { introKey = key; renderIntro(); }
     renderHeader();
     renderBoard();
+    renderDraw();
     renderTeams();
     if (VIEW === 'operator') renderOps();
     updateTimers();
@@ -906,6 +1300,21 @@
     else if (state.phase === 'rules' && e.key === 'ArrowLeft') gotoSlide(state.slide - 1);
   });
   $('showOps').addEventListener('click', () => document.body.classList.remove('hideOps'));
+
+  // 平成モードのマウスのキラキラ
+  const SPARKLES = ['★', '☆', '✦', '✧', '♪'];
+  const SPARKLE_COLORS = ['#ffee00', '#ff3ca0', '#00e5ff', '#ffffff', '#9dff4a'];
+  let lastSparkle = 0;
+  document.addEventListener('mousemove', e => {
+    if (!document.body.classList.contains('heisei')) return;
+    const now = performance.now();
+    if (now - lastSparkle < 45) return;
+    lastSparkle = now;
+    const sp = h('span', { class: 'sparkle', style: `left:${e.clientX - 8}px;top:${e.clientY - 8}px;color:${SPARKLE_COLORS[Math.floor(Math.random() * SPARKLE_COLORS.length)]};--dx:${Math.round(Math.random() * 40 - 20)}px` },
+      SPARKLES[Math.floor(Math.random() * SPARKLES.length)]);
+    sp.addEventListener('animationend', () => sp.remove());
+    document.body.append(sp);
+  });
   document.addEventListener('dblclick', () => {
     if (VIEW === 'screen' && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
   });
@@ -927,7 +1336,9 @@
     });
     $('hardInput').value = state.hardSet.join(',');
     $('easyInput').value = state.easySet.join(',');
+    $('drawInput').value = state.drawSet.join(',');
     $('subtitleInput').value = state.subtitle;
+    $('heiseiInput').checked = state.heisei !== false;
     const pv = $('photoPreview');
     pv.style.display = photoUrl ? 'block' : 'none';
     if (photoUrl) pv.src = photoUrl;
@@ -939,11 +1350,15 @@
     const parseQs = id => $(id).value.split(/[,、\s]+/).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= MAX_Q && n !== ATTACK_Q);
     const hard = parseQs('hardInput');
     const easy = parseQs('easyInput').filter(n => !hard.includes(n)); // 重なったら難問を優先
+    const draw = parseQs('drawInput');
     const subtitle = $('subtitleInput').value.trim();
+    const heisei = $('heiseiInput').checked;
     commit(() => {
+      state.heisei = heisei;
       names.forEach((n, t) => { state.teams[t].name = n; });
       state.hardSet = [...new Set(hard)].sort((a, b) => a - b);
       state.easySet = [...new Set(easy)].sort((a, b) => a - b);
+      state.drawSet = [...new Set(draw)].sort((a, b) => a - b);
       state.subtitle = subtitle;
     });
   });
@@ -972,7 +1387,7 @@
     img.src = src;
   });
   $('openScreen').addEventListener('click', () => {
-    window.open(location.pathname + '?view=screen', 'a36screen', 'popup,width=1280,height=720');
+    window.open(location.pathname + '?view=screen', 'a25screen', 'popup,width=1280,height=720');
   });
   $('resetMain').addEventListener('click', () => {
     state.main = { running: false, left: MAIN_MS, at: null };
@@ -981,8 +1396,8 @@
   });
   $('resetGame').addEventListener('click', () => {
     if (!confirm('盤面と得点をすべて消して最初からやり直します。よろしいですか？')) return;
-    const { teams, hardSet, easySet, subtitle } = state;
-    state = { ...initialState(), teams, hardSet, easySet, subtitle };
+    const { teams, hardSet, easySet, drawSet, subtitle, heisei } = state;
+    state = { ...initialState(), teams, hardSet, easySet, drawSet, subtitle, heisei };
     undoStack = [];
     saveUndo();
     shown.length = 0;
