@@ -13,7 +13,7 @@
     --muted: #9aa3c7;
     --empty: #f3efe6;
     --empty-ink: #8a8577;
-    --legal: #fff3c4;
+    --legal: #ffe27a;
     --accent: #ffd54a;
   }
   * { box-sizing: border-box; }
@@ -22,6 +22,7 @@
     height: 100vh;
     display: grid;
     grid-template-rows: auto 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
     background: var(--bg);
     color: var(--ink);
     font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", system-ui, sans-serif;
@@ -41,10 +42,11 @@
   #qLabel { letter-spacing: .05em; }
   #badge { padding: .4vh 1.2vw; border-radius: 1vh; font-size: 3vh; display: none; }
   #badge.hard { display: inline-block; background: #ff8a3d; color: #1b1000; }
+  #badge.easy { display: inline-block; background: #8fb3ff; color: #06163a; }
   #badge.attack { display: inline-block; background: #e8164a; color: #fff; animation: blink 1s steps(2) infinite; }
   #badge.rescue { display: inline-block; background: #3dbb8a; color: #002014; }
   @keyframes blink { 50% { filter: brightness(1.5); } }
-  #pickInfo { flex: 1; text-align: center; font-size: 3vh; overflow: hidden; text-overflow: ellipsis; }
+  #pickInfo { flex: 1; min-width: 0; text-align: center; font-size: 3vh; overflow: hidden; text-overflow: ellipsis; }
   #pickInfo .rule { display: block; font-size: 2vh; font-weight: 600; color: var(--muted); }
   #pickSec { color: var(--accent); margin-left: 1vw; }
   #mainTimer { font-variant-numeric: tabular-nums; color: var(--muted); }
@@ -59,23 +61,24 @@
     padding: 0 2vw 1.6vh;
     min-height: 0;
   }
-  #boardWrap { position: relative; height: 100%; aspect-ratio: 1; max-width: 64vw; }
+  /* マスの文字は盤面の大きさを基準にする（cqh = 盤面の高さの1%） */
+  #boardWrap { position: relative; height: 100%; aspect-ratio: 1; max-width: 64vw; container-type: size; }
   #board {
     position: absolute;
     inset: 0;
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(6, 1fr);
-    gap: .7vh;
-    padding: .7vh;
-    border-radius: 1.4vh;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    gap: .9cqh;
+    padding: .9cqh;
+    border-radius: 1.8cqh;
     background-color: #070b1c;
     background-size: cover;
     background-position: center;
   }
   .cell {
     position: relative;
-    border-radius: .9vh;
+    border-radius: 1.2cqh;
     background: var(--empty);
     display: flex;
     align-items: center;
@@ -83,11 +86,12 @@
     transition: opacity .45s ease, transform .45s ease, background-color .2s;
     user-select: none;
   }
-  .cell .big { font-size: 5.6vh; font-weight: 900; color: var(--empty-ink); }
-  .cell .small { position: absolute; top: .5vh; left: .8vh; font-size: 1.9vh; font-weight: 800; color: rgba(255,255,255,.8); }
-  .cell.owned .big { color: #fff; font-size: 6.4vh; text-shadow: 0 .25vh .8vh rgba(0,0,0,.5); }
-  .cell.legal { background: var(--legal); box-shadow: inset 0 0 0 .55vh var(--accent); animation: pulse .8s ease-in-out infinite alternate; }
-  .cell.target { box-shadow: inset 0 0 0 .55vh #fff; animation: pulse .8s ease-in-out infinite alternate; }
+  .cell .big { font-size: 7cqh; line-height: 1; font-weight: 900; color: var(--empty-ink); }
+  .cell .small { position: absolute; top: .6cqh; left: 1cqh; font-size: 2.4cqh; font-weight: 800; color: rgba(255,255,255,.8); }
+  .cell.owned .big { color: #fff; font-size: 8cqh; text-shadow: 0 .25vh .8vh rgba(0,0,0,.5); }
+  .cell.legal { background: var(--legal); box-shadow: inset 0 0 0 1.1cqh var(--accent); animation: pulse .8s ease-in-out infinite alternate; }
+  .cell.legal .big { color: #7a5a00; }
+  .cell.target { box-shadow: inset 0 0 0 .7cqh #fff; animation: pulse .8s ease-in-out infinite alternate; }
   body.operator .cell.legal, body.operator .cell.target { cursor: pointer; }
   .cell.just::after { content: ""; position: absolute; inset: -.35vh; border: .5vh solid #fff; border-radius: 1.1vh; pointer-events: none; }
   .cell.flip { animation: flip .5s ease-in-out; }
@@ -120,6 +124,18 @@
   .team.active { box-shadow: 0 0 0 .5vh var(--accent); }
   .team.resting { opacity: .5; }
   .team.winner { box-shadow: 0 0 0 .5vh var(--accent); }
+
+  @media (max-aspect-ratio: 5/4) {
+    main { flex-direction: column; align-items: center; overflow-y: auto; }
+    #boardWrap { height: auto; width: min(100%, 50vh); max-width: none; flex-shrink: 0; }
+    #teams { width: 100%; flex: 1; flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
+    .team { flex: 1 1 30%; min-height: 6vh; grid-template-columns: 5vh 1fr auto; }
+    .team .chip { font-size: 3.2vh; }
+    .team .name { font-size: 2vh; }
+    .team .count { font-size: 3.8vh; }
+    header { flex-wrap: wrap; white-space: normal; }
+    #pickInfo { order: 3; flex-basis: 100%; }
+  }
 
   /* 操作パネル（操作画面のみ） */
   #ops { display: none; background: var(--panel2); padding: 1.2vh 2vw 1.4vh; border-top: 1px solid #222b55; font-size: 14px; }
@@ -247,6 +263,8 @@
     <div class="nameGrid" id="nameGrid"></div>
     <label>難問（3枚）にする問題番号</label>
     <input type="text" id="hardInput" placeholder="例：5,9,15,18">
+    <label>1枚問題にする問題番号</label>
+    <input type="text" id="easyInput" placeholder="例：1,2">
     <div class="note">アタックチャンスは12問目で固定です。</div>
     <label>パネル裏の写真</label>
     <input type="file" id="photoInput" accept="image/*">
@@ -296,6 +314,7 @@
       board: Array(SIZE).fill(-1),
       q: 1,
       hardSet: [5, 9, 15, 18],
+      easySet: [],
       rescue: false,
       rescueDone: false,
       resting: [],
@@ -355,6 +374,9 @@
     const main = state.main; // 本編タイマーは戻さない
     state = JSON.parse(undoStack.pop());
     state.main = main;
+    if ((state.phase === 'title' || state.phase === 'rules') && main.running) {
+      state.main = { running: false, left: mainLeft(), at: null };
+    }
     state.last = null;
     if (state.pick) state.pick = { deadline: null, pausedLeft: PICK_MS };
     save();
@@ -415,6 +437,7 @@
   const emptyCount = () => state.board.filter(v => v === -1).length;
   const isAttack = () => !state.rescue && state.q === ATTACK_Q;
   const isHard = () => !state.rescue && !isAttack() && state.hardSet.includes(state.q);
+  const isEasy = () => !state.rescue && !isAttack() && !isHard() && state.easySet.includes(state.q);
   const freshPick = () => ({ deadline: Date.now() + PICK_MS, pausedLeft: null });
   function mainLeft() {
     const m = state.main;
@@ -458,7 +481,7 @@
   function correct(t) {
     commit(() => {
       const attack = isAttack();
-      const n = attack || isHard() ? 3 : 2;
+      const n = attack || isHard() ? 3 : isEasy() ? 1 : 2;
       state.phase = 'place';
       state.placing = { team: t, left: n, total: n, attack };
       state.pick = freshPick();
@@ -638,6 +661,7 @@
       if (state.rescue) { badge.className = 'rescue'; badge.textContent = '0枚のチームのみ'; }
       else if (isAttack()) { badge.className = 'attack'; badge.textContent = 'アタックチャンス'; }
       else if (isHard()) { badge.className = 'hard'; badge.textContent = '難問・3枚'; }
+      else if (isEasy()) { badge.className = 'easy'; badge.textContent = '1枚問題'; }
     }
     const info = $('pickInfo');
     info.textContent = '';
@@ -666,7 +690,7 @@
       const tags = [];
       if (ended) tags.push(r[t] === 1 ? '優勝' : `${r[t]}位`);
       else {
-        if (state.resting.includes(t) && !state.rescue) tags.push(isAttack() ? '休み（アタックチャンスは参加可）' : '休み');
+        if (state.resting.includes(t) && !state.rescue && !isAttack()) tags.push('休み');
         if (state.wrong.includes(t)) tags.push('誤答');
         if (state.placing && state.placing.team === t) tags.push('配置中');
         if (state.removing && state.removing.team === t) tags.push('特典');
@@ -722,13 +746,19 @@
       });
       gb.append(h('button', { class: 'primary', onclick: () => commit(nextQuestion) }, state.rescue ? '救済問題を終える' : '流す（次の問題へ）'));
       if (!state.rescue && !attack) {
-        gb.append(h('button', {
-          onclick: () => commit(() => {
-            const s = new Set(state.hardSet);
-            s.has(state.q) ? s.delete(state.q) : s.add(state.q);
-            state.hardSet = [...s].sort((a, b) => a - b);
-          }),
-        }, isHard() ? '難問を解除' : 'この問題を難問（3枚）に'));
+        // 難問と1枚問題は同じ問題に重ねない
+        const setKind = kind => commit(() => {
+          const on = kind === 'hard' ? isHard() : isEasy();
+          const without = arr => arr.filter(n => n !== state.q);
+          state.hardSet = without(state.hardSet);
+          state.easySet = without(state.easySet);
+          if (!on) {
+            const key = kind === 'hard' ? 'hardSet' : 'easySet';
+            state[key] = [...state[key], state.q].sort((a, b) => a - b);
+          }
+        });
+        gb.append(h('button', { onclick: () => setKind('hard') }, isHard() ? '難問を解除' : 'この問題を難問（3枚）に'));
+        gb.append(h('button', { onclick: () => setKind('easy') }, isEasy() ? '1枚問題を解除' : 'この問題を1枚問題に'));
       }
       if (attack && !state.rescue && !state.rescueDone && zeroTeams.length && state.wrong.length === 0) {
         gb.append(h('button', { onclick: () => commit(() => { state.rescue = true; state.rescueDone = true; state.wrong = []; }) },
@@ -778,7 +808,7 @@
         ['押したら', hl('5秒以内'), 'に答える'],
         ['間違えると、', hl('次の1問はお休み')])],
     () => [h('div', { class: 'slideTitle' }, 'パネルの置き方'),
-      points(['正解で', hl('2枚'), '（難問は', hl('3枚'), '）。1枚ずつ置きます'],
+      points(['正解で', hl('2枚'), '（難問は', hl('3枚'), '、1枚問題は', hl('1枚'), '）。1枚ずつ置きます'],
         ['置きたいマスを', hl('番号で'), '答える（10秒以内）'],
         ['挟めるマスがあれば、', hl('必ずそこ'), 'に置く'],
         'なければ、自分の色のとなりに置く')],
@@ -896,6 +926,7 @@
         h('input', { type: 'text', id: `name${t}`, value: tm.name }));
     });
     $('hardInput').value = state.hardSet.join(',');
+    $('easyInput').value = state.easySet.join(',');
     $('subtitleInput').value = state.subtitle;
     const pv = $('photoPreview');
     pv.style.display = photoUrl ? 'block' : 'none';
@@ -905,11 +936,14 @@
   }
   $('saveSettings').addEventListener('click', () => {
     const names = state.teams.map((tm, t) => $(`name${t}`).value.trim() || `チーム${t + 1}`);
-    const hard = $('hardInput').value.split(/[,、\s]+/).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= MAX_Q && n !== ATTACK_Q);
+    const parseQs = id => $(id).value.split(/[,、\s]+/).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= MAX_Q && n !== ATTACK_Q);
+    const hard = parseQs('hardInput');
+    const easy = parseQs('easyInput').filter(n => !hard.includes(n)); // 重なったら難問を優先
     const subtitle = $('subtitleInput').value.trim();
     commit(() => {
       names.forEach((n, t) => { state.teams[t].name = n; });
       state.hardSet = [...new Set(hard)].sort((a, b) => a - b);
+      state.easySet = [...new Set(easy)].sort((a, b) => a - b);
       state.subtitle = subtitle;
     });
   });
@@ -947,8 +981,8 @@
   });
   $('resetGame').addEventListener('click', () => {
     if (!confirm('盤面と得点をすべて消して最初からやり直します。よろしいですか？')) return;
-    const { teams, hardSet, subtitle } = state;
-    state = { ...initialState(), teams, hardSet, subtitle };
+    const { teams, hardSet, easySet, subtitle } = state;
+    state = { ...initialState(), teams, hardSet, easySet, subtitle };
     undoStack = [];
     saveUndo();
     shown.length = 0;
