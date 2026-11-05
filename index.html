@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アタック36</title>
+<style>
+  :root {
+    --bg: #0f1530;
+    --panel: #182044;
+    --panel2: #0b1028;
+    --ink: #f5f3ee;
+    --muted: #9aa3c7;
+    --empty: #f3efe6;
+    --empty-ink: #8a8577;
+    --legal: #fff3c4;
+    --accent: #ffd54a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  /* ヘッダー */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 2vw;
+    padding: 1.4vh 2vw;
+    font-size: 3.4vh;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  #qLabel { letter-spacing: .05em; }
+  #badge { padding: .4vh 1.2vw; border-radius: 1vh; font-size: 3vh; display: none; }
+  #badge.hard { display: inline-block; background: #ff8a3d; color: #1b1000; }
+  #badge.attack { display: inline-block; background: #e8164a; color: #fff; animation: blink 1s steps(2) infinite; }
+  #badge.rescue { display: inline-block; background: #3dbb8a; color: #002014; }
+  @keyframes blink { 50% { filter: brightness(1.5); } }
+  #pickInfo { flex: 1; text-align: center; font-size: 3vh; overflow: hidden; text-overflow: ellipsis; }
+  #pickInfo .rule { display: block; font-size: 2vh; font-weight: 600; color: var(--muted); }
+  #pickSec { color: var(--accent); margin-left: 1vw; }
+  #mainTimer { font-variant-numeric: tabular-nums; color: var(--muted); }
+  #mainTimer.warn { color: #ff8a8a; }
+
+  /* 盤面と得点 */
+  main {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 2vw;
+    padding: 0 2vw 1.6vh;
+    min-height: 0;
+  }
+  #boardWrap { position: relative; height: 100%; aspect-ratio: 1; max-width: 64vw; }
+  #board {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: .7vh;
+    padding: .7vh;
+    border-radius: 1.4vh;
+    background-color: #070b1c;
+    background-size: cover;
+    background-position: center;
+  }
+  .cell {
+    position: relative;
+    border-radius: .9vh;
+    background: var(--empty);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity .45s ease, transform .45s ease, background-color .2s;
+    user-select: none;
+  }
+  .cell .big { font-size: 5.6vh; font-weight: 900; color: var(--empty-ink); }
+  .cell .small { position: absolute; top: .5vh; left: .8vh; font-size: 1.9vh; font-weight: 800; color: rgba(255,255,255,.8); }
+  .cell.owned .big { color: #fff; font-size: 6.4vh; text-shadow: 0 .25vh .8vh rgba(0,0,0,.5); }
+  .cell.legal { background: var(--legal); box-shadow: inset 0 0 0 .55vh var(--accent); animation: pulse .8s ease-in-out infinite alternate; }
+  .cell.target { box-shadow: inset 0 0 0 .55vh #fff; animation: pulse .8s ease-in-out infinite alternate; }
+  body.operator .cell.legal, body.operator .cell.target { cursor: pointer; }
+  .cell.just::after { content: ""; position: absolute; inset: -.35vh; border: .5vh solid #fff; border-radius: 1.1vh; pointer-events: none; }
+  .cell.flip { animation: flip .5s ease-in-out; }
+  .cell.pop { animation: pop .38s ease-out; }
+  .cell.gone { opacity: 0; transform: scale(.8); }
+  @keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.12); } }
+  @keyframes flip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+  @keyframes pop { 0% { transform: scale(.3); } 70% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  #noPhoto { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 3vh; color: var(--muted); }
+
+  #teams { width: 26vw; display: flex; flex-direction: column; gap: 1vh; min-height: 0; }
+  .team {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 7vh 1fr auto;
+    align-items: center;
+    gap: 1vw;
+    padding: 0 1.2vw 0 0;
+    border-radius: 1.2vh;
+    background: var(--panel);
+    overflow: hidden;
+    position: relative;
+    transition: opacity .3s;
+  }
+  .team .chip { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 4.4vh; font-weight: 900; color: #fff; text-shadow: 0 .2vh .6vh rgba(0,0,0,.45); }
+  .team .name { font-size: 2.6vh; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team .tags { display: block; font-size: 1.9vh; color: var(--accent); margin-top: .3vh; }
+  .team .count { font-size: 5.4vh; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .team .count small { font-size: 2vh; margin-left: .3vw; color: var(--muted); }
+  .team.active { box-shadow: 0 0 0 .5vh var(--accent); }
+  .team.resting { opacity: .5; }
+  .team.winner { box-shadow: 0 0 0 .5vh var(--accent); }
+
+  /* 操作パネル（操作画面のみ） */
+  #ops { display: none; background: var(--panel2); padding: 1.2vh 2vw 1.4vh; border-top: 1px solid #222b55; font-size: 14px; }
+  body.operator #ops { display: block; }
+  body.operator.hideOps #ops { display: none; }
+  #status { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+  #teamBtns { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 8px; }
+  .tb { border-radius: 8px; background: var(--panel); padding: 6px; border-top: 5px solid; }
+  .tb .tn { font-weight: 700; font-size: 13px; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tb .row { display: flex; gap: 5px; }
+  .tb button { flex: 1; }
+  #globalBtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  #globalBtns .spacer { flex: 1; }
+  button {
+    font: inherit;
+    font-weight: 700;
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: #2c3770;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.2); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.ok { background: #1f8a4c; }
+  button.ng { background: #a8323e; }
+  button.primary { background: var(--accent); color: #1d1600; }
+  button.ghost { background: transparent; border: 1px solid #3a4680; }
+  #showOps { position: fixed; right: 10px; bottom: 10px; display: none; opacity: .4; }
+  body.operator.hideOps #showOps { display: block; }
+
+  /* タイトルとルール説明 */
+  :root { --u: min(1vh, 1.5vw); }
+  main, #intro { grid-row: 2; grid-column: 1; }
+  #intro { display: none; min-height: 0; padding: 0 5vw calc(var(--u) * 3); flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  body.intro main { display: none; }
+  body.intro #intro { display: flex; }
+  body.intro #mainTimer { visibility: hidden; }
+  body.title header { visibility: hidden; }
+  .logo { display: flex; gap: calc(var(--u) * 1.2); margin-bottom: calc(var(--u) * 3); }
+  .logo span { width: calc(var(--u) * 7); height: calc(var(--u) * 7); border-radius: calc(var(--u) * 1.2); animation: pop .5s ease-out backwards; }
+  .titleText { font-size: calc(var(--u) * 15); font-weight: 900; letter-spacing: .04em; line-height: 1; }
+  .titleText small { display: block; font-size: calc(var(--u) * 4); letter-spacing: .3em; color: var(--muted); margin-top: calc(var(--u) * 1.5); }
+  .subtitle { font-size: calc(var(--u) * 4.4); font-weight: 700; margin-top: calc(var(--u) * 4); color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.4); margin-top: calc(var(--u) * 5); }
+  .chips div { display: flex; align-items: center; gap: calc(var(--u) * 1); padding: .calc(var(--u) * 8) calc(var(--u) * 2) .calc(var(--u) * 8) .calc(var(--u) * 8); border-radius: calc(var(--u) * 1.2); background: var(--panel); font-size: calc(var(--u) * 2.8); font-weight: 700; }
+  .chips b { width: calc(var(--u) * 5); height: calc(var(--u) * 5); border-radius: .calc(var(--u) * 9); display: flex; align-items: center; justify-content: center; color: #fff; font-size: calc(var(--u) * 3.2); }
+  .slideTitle { font-size: calc(var(--u) * 7); font-weight: 900; margin-bottom: calc(var(--u) * 4); }
+  .slideTitle em { font-style: normal; color: var(--accent); }
+  .points { list-style: none; padding: 0; margin: 0; text-align: left; font-size: calc(var(--u) * 4.2); font-weight: 700; line-height: 1.5; }
+  .points li { padding-left: 1.4em; position: relative; margin: calc(var(--u) * 1.2) 0; }
+  .points li::before { content: ""; position: absolute; left: .2em; top: .55em; width: .55em; height: .55em; border-radius: .15em; background: var(--accent); }
+  .points .hl { color: var(--accent); }
+  .demo { display: flex; gap: calc(var(--u) * 1.4); margin: calc(var(--u) * 1) 0 calc(var(--u) * 4); }
+  .demo div { width: calc(var(--u) * 14); height: calc(var(--u) * 14); border-radius: calc(var(--u) * 1.6); background: var(--empty); }
+  .demo .d0 { background: #E53935; }
+  .demo .d1 { animation: d-flip1 4.4s infinite; }
+  .demo .d2 { animation: d-flip2 4.4s infinite; }
+  .demo .d3 { animation: d-place 4.4s infinite; position: relative; }
+  .demo .d3::after { content: "ここに置く"; position: absolute; left: 50%; top: 105%; transform: translateX(-50%); font-size: calc(var(--u) * 2.4); color: var(--accent); white-space: nowrap; }
+  .demoCaption { font-size: calc(var(--u) * 3.4); font-weight: 700; color: var(--muted); margin-top: calc(var(--u) * 1); }
+  @keyframes d-place {
+    0%, 18% { background: var(--empty); transform: scale(1); }
+    19% { background: #E53935; transform: scale(.3); }
+    26% { transform: scale(1.1); }
+    30%, 92% { background: #E53935; transform: scale(1); }
+    100% { background: var(--empty); }
+  }
+  @keyframes d-flip1 {
+    0%, 36% { background: #1E5FD6; transform: scaleX(1); }
+    41% { background: #1E5FD6; transform: scaleX(0); }
+    41.5% { background: #E53935; transform: scaleX(0); }
+    46%, 92% { background: #E53935; transform: scaleX(1); }
+    100% { background: #1E5FD6; }
+  }
+  @keyframes d-flip2 {
+    0%, 46% { background: #E8B400; transform: scaleX(1); }
+    51% { background: #E8B400; transform: scaleX(0); }
+    51.5% { background: #E53935; transform: scaleX(0); }
+    56%, 92% { background: #E53935; transform: scaleX(1); }
+    100% { background: #E8B400; }
+  }
+
+  dialog { background: var(--panel); color: var(--ink); border: 1px solid #3a4680; border-radius: 12px; padding: 20px 24px; width: min(560px, 92vw); font-size: 14px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h2 { margin: 0 0 12px; font-size: 18px; }
+  dialog label { display: block; margin: 10px 0 4px; color: var(--muted); }
+  dialog input[type=text] { width: 100%; padding: 7px 9px; border-radius: 6px; border: 1px solid #3a4680; background: #0f1530; color: var(--ink); font: inherit; }
+  .nameGrid { display: grid; grid-template-columns: 28px 1fr; gap: 6px 8px; align-items: center; }
+  .nameGrid span { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+  #photoPreview { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; display: none; margin-top: 8px; }
+  .dlgBtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <span id="qLabel"></span>
+  <span id="badge"></span>
+  <span id="pickInfo"></span>
+  <span id="mainTimer"></span>
+</header>
+<main>
+  <div id="boardWrap">
+    <div id="board"></div>
+    <div id="noPhoto">写真が設定されていません</div>
+  </div>
+  <div id="teams"></div>
+</main>
+<section id="intro"></section>
+<section id="ops">
+  <div id="status"></div>
+  <div id="teamBtns"></div>
+  <div id="globalBtns"></div>
+</section>
+<button id="showOps" class="ghost">操作パネル (H)</button>
+
+<dialog id="settings">
+  <form method="dialog">
+    <h2>設定</h2>
+    <label>タイトル画面に出す一言</label>
+    <input type="text" id="subtitleInput" placeholder="例：たろう ＆ はなこ 結婚おめでとう！">
+    <label>チーム名（テーブル名）</label>
+    <div class="nameGrid" id="nameGrid"></div>
+    <label>難問（3枚）にする問題番号</label>
+    <input type="text" id="hardInput" placeholder="例：5,9,15,18">
+    <div class="note">アタックチャンスは12問目で固定です。</div>
+    <label>パネル裏の写真</label>
+    <input type="file" id="photoInput" accept="image/*">
+    <div class="note">中央を正方形に切り抜いて使います。顔が中央に来る写真を選んでください。</div>
+    <img id="photoPreview" alt="">
+    <div class="dlgBtns">
+      <button value="save" class="primary" id="saveSettings">保存して閉じる</button>
+      <button type="button" id="openScreen">観客用画面を開く</button>
+      <button type="button" id="resetMain">本編タイマーを20:00に戻す</button>
+      <button type="button" id="resetGame" class="ng">ゲームを最初からやり直す</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  // ---- 定数 ----
+  const COLORS = [
+    { name: '赤', bg: '#E53935' },
+    { name: '青', bg: '#1E5FD6' },
+    { name: '緑', bg: '#2E9E44' },
+    { name: '黄', bg: '#E8B400' },
+    { name: 'オレンジ', bg: '#F57C00' },
+    { name: '紫', bg: '#8E44AD' },
+  ];
+  const SIZE = 36;
+  const CENTER = [14, 15, 20, 21]; // 15・16・21・22番
+  const ATTACK_Q = 12;
+  const MAX_Q = 20;
+  const MAIN_MS = 20 * 60 * 1000;
+  const PICK_MS = 10 * 1000;
+  const REVEAL_STEP_MS = 110;
+  const KEY = 'a36-state';
+  const PHOTO_KEY = 'a36-photo';
+  const VIEW = new URLSearchParams(location.search).get('view') === 'screen' ? 'screen' : 'operator';
+  const DIRS = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+
+  // ---- 状態 ----
+  function initialState() {
+    return {
+      v: 1,
+      subtitle: '',
+      slide: 0,
+      teams: COLORS.map((c, i) => ({ name: `チーム${i + 1}` })),
+      board: Array(SIZE).fill(-1),
+      q: 1,
+      hardSet: [5, 9, 15, 18],
+      rescue: false,
+      rescueDone: false,
+      resting: [],
+      wrong: [],
+      phase: 'title', // title | rules | answer | place | remove | ended | reveal
+      placing: null,   // { team, left, total, attack }
+      removing: null,  // { team }
+      pick: null,      // { deadline, pausedLeft }
+      main: { running: false, left: MAIN_MS, at: null },
+      last: null,      // { cell, flips }
+      revealAt: null,
+      endReason: null,
+    };
+  }
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && s.v === 1 && Array.isArray(s.board) && s.board.length === SIZE) return { ...initialState(), ...s };
+    } catch (e) {}
+    return null;
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function loadPhoto() {
+    try { return localStorage.getItem(PHOTO_KEY); } catch (e) { return null; }
+  }
+
+  let state = load() || initialState();
+  let photoUrl = loadPhoto();
+  let undoStack = [];
+
+  function commit(fn) {
+    undoStack.push(JSON.stringify(state));
+    if (undoStack.length > 300) undoStack.shift();
+    fn();
+    save();
+    render();
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    const main = state.main; // 本編タイマーは戻さない
+    state = JSON.parse(undoStack.pop());
+    state.main = main;
+    state.last = null;
+    if (state.pick) state.pick = { deadline: null, pausedLeft: PICK_MS };
+    save();
+    render();
+  }
+
+  // ---- ルール ----
+  const inb = (r, c) => r >= 0 && r < 6 && c >= 0 && c < 6;
+  function neighbors(cell) {
+    const r = Math.floor(cell / 6), c = cell % 6, out = [];
+    for (const [dr, dc] of DIRS) if (inb(r + dr, c + dc)) out.push((r + dr) * 6 + c + dc);
+    return out;
+  }
+  // cell に team t が置いたとき裏返るマス（8方向同時、混色可、空きマスで不成立、連鎖なし）
+  function flipsFor(board, cell, t) {
+    if (board[cell] !== -1) return [];
+    const r0 = Math.floor(cell / 6), c0 = cell % 6, out = [];
+    for (const [dr, dc] of DIRS) {
+      let r = r0 + dr, c = c0 + dc;
+      const line = [];
+      while (inb(r, c)) {
+        const v = board[r * 6 + c];
+        if (v === -1 || v === t) break;
+        line.push(r * 6 + c);
+        r += dr; c += dc;
+      }
+      if (line.length && inb(r, c) && board[r * 6 + c] === t) out.push(...line);
+    }
+    return out;
+  }
+  // 置けるマスと、その理由
+  function legalInfo(board, t) {
+    const empty = [];
+    board.forEach((v, i) => { if (v === -1) empty.push(i); });
+    if (!empty.length) return { cells: [], kind: 'full' };
+    if (empty.length === SIZE) return { cells: CENTER.slice(), kind: 'center' };
+    const flip = empty.filter(i => flipsFor(board, i, t).length);
+    if (flip.length) return { cells: flip, kind: 'flip' };
+    const own = empty.filter(i => neighbors(i).some(n => board[n] === t));
+    if (own.length) return { cells: own, kind: 'own' };
+    const any = empty.filter(i => neighbors(i).some(n => board[n] !== -1));
+    return { cells: any.length ? any : empty, kind: 'any' };
+  }
+  const RULE_TEXT = {
+    center: '最初の1枚：中央4マスから選びます',
+    flip: '挟めるマスがあるので、そこに置きます',
+    own: '自分の色の隣に置けます',
+    any: 'どれかのパネルの隣に置けます',
+    full: '',
+  };
+
+  const counts = () => {
+    const c = Array(6).fill(0);
+    state.board.forEach(v => { if (v !== -1) c[v]++; });
+    return c;
+  };
+  const emptyCount = () => state.board.filter(v => v === -1).length;
+  const isAttack = () => !state.rescue && state.q === ATTACK_Q;
+  const isHard = () => !state.rescue && !isAttack() && state.hardSet.includes(state.q);
+  const freshPick = () => ({ deadline: Date.now() + PICK_MS, pausedLeft: null });
+  function mainLeft() {
+    const m = state.main;
+    return Math.max(0, m.running ? m.left - (Date.now() - m.at) : m.left);
+  }
+
+  // ---- 進行 ----
+  function endGame(reason) {
+    state.main = { running: false, left: mainLeft(), at: null };
+    state.phase = 'ended';
+    state.placing = null;
+    state.removing = null;
+    state.pick = null;
+    state.endReason = reason;
+  }
+
+  function nextQuestion() {
+    state.placing = null;
+    state.removing = null;
+    state.pick = null;
+    if (state.rescue) {
+      // 救済問題は20問に数えない。休みの状態もそのまま
+      state.rescue = false;
+      state.wrong = [];
+      state.phase = 'answer';
+      return;
+    }
+    if (state.q >= MAX_Q) return endGame('20問が終わりました');
+    if (mainLeft() <= 0) return endGame('本編20分が経過しました');
+    state.resting = state.wrong.slice();
+    state.wrong = [];
+    state.q++;
+    state.phase = 'answer';
+  }
+
+  function finishQuestion() {
+    if (emptyCount() === 0) return endGame('全36マスが埋まりました');
+    nextQuestion();
+  }
+
+  function correct(t) {
+    commit(() => {
+      const attack = isAttack();
+      const n = attack || isHard() ? 3 : 2;
+      state.phase = 'place';
+      state.placing = { team: t, left: n, total: n, attack };
+      state.pick = freshPick();
+      state.last = null;
+    });
+  }
+
+  function wrong(t) {
+    commit(() => { if (!state.wrong.includes(t)) state.wrong.push(t); });
+  }
+
+  function place(cell) {
+    commit(() => {
+      const t = state.placing.team;
+      const flips = flipsFor(state.board, cell, t);
+      state.board[cell] = t;
+      flips.forEach(i => { state.board[i] = t; });
+      state.last = { cell, flips };
+      state.placing.left--;
+      if (state.placing.left > 0 && emptyCount() > 0) {
+        state.pick = freshPick();
+        return;
+      }
+      const attack = state.placing.attack;
+      state.placing = null;
+      state.pick = null;
+      if (attack && state.board.some(v => v !== -1 && v !== t)) {
+        state.phase = 'remove';
+        state.removing = { team: t };
+        state.pick = freshPick();
+        return;
+      }
+      finishQuestion();
+    });
+  }
+
+  function removePanel(cell) {
+    commit(() => {
+      state.board[cell] = -1;
+      state.last = { cell, flips: [] };
+      finishQuestion();
+    });
+  }
+
+  function togglePickTimer() {
+    const p = state.pick;
+    if (!p) return;
+    if (p.deadline) state.pick = { deadline: null, pausedLeft: Math.max(0, p.deadline - Date.now()) };
+    else state.pick = { deadline: Date.now() + p.pausedLeft, pausedLeft: null };
+    save();
+    render();
+  }
+
+  function startGame() {
+    commit(() => {
+      state.phase = 'answer';
+      state.main = { running: true, left: mainLeft(), at: Date.now() };
+    });
+  }
+
+  function gotoSlide(n) {
+    if (n < 0) return commit(() => { state.phase = 'title'; });
+    if (n >= SLIDES.length) return startGame();
+    commit(() => { state.phase = 'rules'; state.slide = n; });
+  }
+
+  function toggleMain() {
+    const m = state.main;
+    if (m.running) state.main = { running: false, left: mainLeft(), at: null };
+    else state.main = { running: true, left: m.left, at: Date.now() };
+    save();
+    render();
+  }
+
+  // ---- 描画 ----
+  const $ = id => document.getElementById(id);
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') el.className = v;
+      else if (k === 'style') el.style.cssText = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else if (k === 'disabled') el.disabled = !!v;
+      else el.setAttribute(k, v);
+    }
+    for (const kid of kids) if (kid != null) el.append(kid);
+    return el;
+  }
+
+  document.body.classList.add(VIEW);
+  const boardEl = $('board');
+  const cells = [];
+  const shown = [];
+  for (let i = 0; i < SIZE; i++) {
+    const el = h('div', { class: 'cell' }, h('span', { class: 'small' }), h('span', { class: 'big' }));
+    el.addEventListener('animationend', e => { if (e.animationName !== 'pulse') el.classList.remove('flip', 'pop'); });
+    el.addEventListener('click', () => onCell(i));
+    boardEl.append(el);
+    cells.push(el);
+  }
+
+  function paint(i) {
+    const el = cells[i], v = state.board[i];
+    if (v === -1) {
+      el.style.backgroundColor = '';
+      el.classList.remove('owned');
+      el.lastChild.textContent = i + 1;
+      el.firstChild.textContent = '';
+    } else {
+      el.style.backgroundColor = COLORS[v].bg;
+      el.classList.add('owned');
+      el.lastChild.textContent = v + 1;
+      el.firstChild.textContent = i + 1;
+    }
+  }
+
+  const cheb = (a, b) => Math.max(Math.abs(Math.floor(a / 6) - Math.floor(b / 6)), Math.abs(a % 6 - b % 6));
+
+  function renderBoard() {
+    const legal = state.phase === 'place' ? new Set(legalInfo(state.board, state.placing.team).cells) : null;
+    const rt = state.phase === 'remove' ? state.removing.team : null;
+    for (let i = 0; i < SIZE; i++) {
+      const el = cells[i], v = state.board[i], prev = shown[i];
+      if (prev === undefined) {
+        paint(i);
+      } else if (prev !== v) {
+        if (prev === -1) {
+          paint(i);
+          el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+        } else {
+          const last = state.last;
+          const delay = last && last.flips.includes(i) ? 320 + 120 * (cheb(i, last.cell) - 1) : 0;
+          setTimeout(() => {
+            el.classList.remove('flip'); void el.offsetWidth; el.classList.add('flip');
+            setTimeout(() => paint(i), 250);
+          }, delay);
+        }
+      }
+      shown[i] = v;
+      el.classList.toggle('legal', !!legal && legal.has(i));
+      el.classList.toggle('target', rt !== null && v !== -1 && v !== rt);
+      el.classList.toggle('just', !!state.last && state.last.cell === i && v !== -1 && state.phase !== 'reveal');
+    }
+    const revealing = state.phase === 'reveal';
+    boardEl.style.backgroundImage = revealing && photoUrl ? `url("${photoUrl}")` : '';
+    $('noPhoto').style.display = revealing && !photoUrl ? 'flex' : 'none';
+    if (!revealing) cells.forEach(el => el.classList.remove('gone'));
+  }
+
+  function ranks() {
+    const c = counts();
+    return c.map(n => 1 + c.filter(m => m > n).length);
+  }
+
+  function renderHeader() {
+    const ended = state.phase === 'ended' || state.phase === 'reveal';
+    $('qLabel').textContent = state.phase === 'title' ? ''
+      : state.phase === 'rules' ? `ルール説明 ${state.slide + 1} / ${SLIDES.length}`
+      : ended ? '結果発表' : state.rescue ? '救済問題' : `第${state.q}問 / ${MAX_Q}`;
+    const badge = $('badge');
+    badge.className = '';
+    badge.textContent = '';
+    $('pickInfo').textContent = '';
+    if (state.phase === 'title' || state.phase === 'rules') return;
+    if (!ended) {
+      if (state.rescue) { badge.className = 'rescue'; badge.textContent = '0枚のチームのみ'; }
+      else if (isAttack()) { badge.className = 'attack'; badge.textContent = 'アタックチャンス'; }
+      else if (isHard()) { badge.className = 'hard'; badge.textContent = '難問・3枚'; }
+    }
+    const info = $('pickInfo');
+    info.textContent = '';
+    if (state.phase === 'place') {
+      const t = state.placing.team;
+      info.append(`${state.teams[t].name}（${COLORS[t].name}）あと${state.placing.left}枚`,
+        h('span', { id: 'pickSec' }),
+        h('span', { class: 'rule' }, RULE_TEXT[legalInfo(state.board, t).kind]));
+    } else if (state.phase === 'remove') {
+      const t = state.removing.team;
+      info.append(`${state.teams[t].name}：他チームのパネルを1枚戻せます`, h('span', { id: 'pickSec' }));
+    } else if (ended) {
+      const r = ranks();
+      const top = r.filter(x => x === 1).length;
+      info.textContent = top > 1 ? `同数${top}チーム → 決勝問題へ` : '';
+    }
+  }
+
+  function renderTeams() {
+    const wrap = $('teams');
+    wrap.textContent = '';
+    const c = counts();
+    const r = ranks();
+    const ended = state.phase === 'ended' || state.phase === 'reveal';
+    state.teams.forEach((tm, t) => {
+      const tags = [];
+      if (ended) tags.push(r[t] === 1 ? '優勝' : `${r[t]}位`);
+      else {
+        if (state.resting.includes(t) && !state.rescue) tags.push(isAttack() ? '休み（アタックチャンスは参加可）' : '休み');
+        if (state.wrong.includes(t)) tags.push('誤答');
+        if (state.placing && state.placing.team === t) tags.push('配置中');
+        if (state.removing && state.removing.team === t) tags.push('特典');
+      }
+      const cls = ['team'];
+      if ((state.placing && state.placing.team === t) || (state.removing && state.removing.team === t)) cls.push('active');
+      if (!ended && !state.rescue && !isAttack() && state.resting.includes(t)) cls.push('resting');
+      if (ended && r[t] === 1) cls.push('winner');
+      wrap.append(h('div', { class: cls.join(' ') },
+        h('div', { class: 'chip', style: `background:${COLORS[t].bg}` }, String(t + 1)),
+        h('div', { class: 'name' }, tm.name, h('span', { class: 'tags' }, tags.join('・'))),
+        h('div', { class: 'count' }, String(c[t]), h('small', {}, '枚'))));
+    });
+  }
+
+  function renderOps() {
+    const status = $('status');
+    const tb = $('teamBtns');
+    const gb = $('globalBtns');
+    tb.textContent = '';
+    gb.textContent = '';
+    const p = state.phase;
+    const attack = isAttack();
+
+    if (p === 'title') {
+      status.textContent = 'タイトル画面です。会場が落ち着いたら「ルール説明へ」';
+      gb.append(h('button', { class: 'primary', onclick: () => gotoSlide(0) }, 'ルール説明へ →'));
+      gb.append(h('button', { class: 'ghost', onclick: startGame }, 'ルール説明を飛ばして本編スタート'));
+    } else if (p === 'rules') {
+      const last = state.slide === SLIDES.length - 1;
+      status.textContent = last
+        ? '最後のスライドです。「本編スタート」で第1問へ進み、本編タイマー（20分）が動き出します'
+        : 'ルール説明中です。←→キーでも進められます';
+      gb.append(h('button', { onclick: () => gotoSlide(state.slide - 1) }, '← 前へ'));
+      gb.append(h('button', { class: 'primary', onclick: () => gotoSlide(state.slide + 1) }, last ? '本編スタート（タイマー開始）' : '次へ →'));
+    } else if (p === 'answer') {
+      if (state.rescue) status.textContent = '救済問題：0枚のチームだけが答えます。正解なら2枚。終わったら「救済問題を終える」';
+      else if (attack) status.textContent = 'アタックチャンス：正解が出るまで解答権を移します。全チーム誤答なら予備問題で出し直し（「流す」は押さない）';
+      else if (state.wrong.length >= 2) status.textContent = '2チーム誤答：正解を発表して「流す」を押してください';
+      else if (state.wrong.length === 1) status.textContent = '誤答：残りのチームでもう一度早押し。正解なら「正解」、誤答なら「誤答」';
+      else status.textContent = '早押しで答えたチームの「正解」か「誤答」を押す。誰も押さず10秒経ったら「流す」';
+
+      const zeroTeams = counts().map((n, t) => n === 0 ? t : -1).filter(t => t >= 0);
+      state.teams.forEach((tm, t) => {
+        const blocked = (!attack && !state.rescue && state.resting.includes(t)) || state.wrong.includes(t)
+          || (state.rescue && !zeroTeams.includes(t));
+        tb.append(h('div', { class: 'tb', style: `border-top-color:${COLORS[t].bg}` },
+          h('div', { class: 'tn' }, `${t + 1} ${tm.name}`),
+          h('div', { class: 'row' },
+            h('button', { class: 'ok', disabled: blocked, onclick: () => correct(t) }, '正解'),
+            h('button', { class: 'ng', disabled: blocked, onclick: () => wrong(t) }, '誤答'))));
+      });
+      gb.append(h('button', { class: 'primary', onclick: () => commit(nextQuestion) }, state.rescue ? '救済問題を終える' : '流す（次の問題へ）'));
+      if (!state.rescue && !attack) {
+        gb.append(h('button', {
+          onclick: () => commit(() => {
+            const s = new Set(state.hardSet);
+            s.has(state.q) ? s.delete(state.q) : s.add(state.q);
+            state.hardSet = [...s].sort((a, b) => a - b);
+          }),
+        }, isHard() ? '難問を解除' : 'この問題を難問（3枚）に'));
+      }
+      if (attack && !state.rescue && !state.rescueDone && zeroTeams.length && state.wrong.length === 0) {
+        gb.append(h('button', { onclick: () => commit(() => { state.rescue = true; state.rescueDone = true; state.wrong = []; }) },
+          `救済問題を出す（0枚：${zeroTeams.map(t => t + 1).join('・')}）`));
+      }
+      gb.append(h('button', { class: 'ghost', onclick: () => { if (confirm('ここでゲームを終了しますか？')) commit(() => endGame('司会判断で終了')); } }, 'ここで終了'));
+    } else if (p === 'place') {
+      const t = state.placing.team;
+      status.textContent = `${t + 1} ${state.teams[t].name}：チームが言ったマスを盤面でクリック（あと${state.placing.left}枚）。10秒過ぎると自動でランダムに置きます`;
+      gb.append(h('button', { onclick: togglePickTimer }, state.pick && state.pick.deadline ? '選択タイマーを止める' : '選択タイマーを再開'));
+    } else if (p === 'remove') {
+      const t = state.removing.team;
+      status.textContent = `${t + 1} ${state.teams[t].name}：空きマスに戻す他チームのパネルを盤面でクリック`;
+      gb.append(h('button', { onclick: togglePickTimer }, state.pick && state.pick.deadline ? '選択タイマーを止める' : '選択タイマーを再開'));
+      gb.append(h('button', { onclick: () => commit(finishQuestion) }, '特典を使わない'));
+    } else if (p === 'ended') {
+      status.textContent = `${state.endReason}。結果を確認して「写真を公開」を押してください`;
+      gb.append(h('button', { class: 'primary', onclick: () => commit(() => { state.phase = 'reveal'; state.revealAt = Date.now(); }) }, '写真を公開'));
+    } else if (p === 'reveal') {
+      status.textContent = photoUrl ? '写真を公開しました' : '写真が設定されていません（設定から選べます）';
+      gb.append(h('button', { onclick: () => commit(() => { state.phase = 'ended'; state.revealAt = null; }) }, 'パネルに戻す'));
+    }
+
+    gb.append(h('span', { class: 'spacer' }));
+    gb.append(h('button', { disabled: !undoStack.length, onclick: undo }, '1手戻す (⌘Z)'));
+    gb.append(h('button', { onclick: toggleMain }, state.main.running ? '本編タイマー 一時停止' : '本編タイマー スタート'));
+    gb.append(h('button', { class: 'ghost', onclick: openSettings }, '設定'));
+    gb.append(h('button', { class: 'ghost', onclick: () => document.body.classList.add('hideOps') }, 'パネルを隠す (H)'));
+  }
+
+  // ---- タイトルとルール説明 ----
+  const hl = text => h('span', { class: 'hl' }, text);
+  const points = (...items) => h('ul', { class: 'points' }, ...items.map(it => h('li', {}, ...[].concat(it))));
+  const teamChips = () => h('div', { class: 'chips' }, ...state.teams.map((tm, t) =>
+    h('div', {}, h('b', { style: `background:${COLORS[t].bg}` }, String(t + 1)), tm.name)));
+  const SLIDES = [
+    () => [h('div', { class: 'slideTitle' }, '遊び方'),
+      points('新郎新婦にまつわるクイズに、テーブル対抗で挑戦',
+        ['正解すると、', hl('パネルを置ける'), 'チャンス'],
+        ['最後にパネルが', hl('一番多いチームが優勝')]),
+      teamChips()],
+    () => [h('div', { class: 'slideTitle' }, '答え方'),
+      points(['早押しボタンを押す前は、', hl('テーブルで相談OK')],
+        ['押したら', hl('5秒以内'), 'に答える'],
+        ['間違えると、', hl('次の1問はお休み')])],
+    () => [h('div', { class: 'slideTitle' }, 'パネルの置き方'),
+      points(['正解で', hl('2枚'), '（難問は', hl('3枚'), '）。1枚ずつ置きます'],
+        ['置きたいマスを', hl('番号で'), '答える（10秒以内）'],
+        ['挟めるマスがあれば、', hl('必ずそこ'), 'に置く'],
+        'なければ、自分の色のとなりに置く')],
+    () => [h('div', { class: 'slideTitle' }, '挟むと、裏返る'),
+      h('div', { class: 'demo' }, h('div', { class: 'd0' }), h('div', { class: 'd1' }), h('div', { class: 'd2' }), h('div', { class: 'd3' })),
+      h('div', { class: 'demoCaption' }, '縦・横・斜め、どの向きでもOK。色が混ざっていてもまとめて裏返ります')],
+    () => [h('div', { class: 'slideTitle' }, '12問目は ', h('em', {}, 'アタックチャンス')),
+      points(['正解すると', hl('3枚'), '置いて、さらに', hl('他チームのパネルを1枚消せる')],
+        '20問・20分・全マスが埋まる、のどれかで終了',
+        ['パネルの裏には……', hl('お楽しみに！')])],
+  ];
+
+  function renderIntro() {
+    const el = $('intro');
+    el.textContent = '';
+    if (state.phase === 'title') {
+      el.append(
+        h('div', { class: 'logo' }, ...COLORS.map((c, i) => h('span', { style: `background:${c.bg};animation-delay:${i * 0.08}s` }))),
+        h('div', { class: 'titleText' }, 'アタック36', h('small', {}, 'ATTACK 36')),
+        ...(state.subtitle ? [h('div', { class: 'subtitle' }, state.subtitle)] : []),
+        teamChips());
+    } else if (state.phase === 'rules') {
+      el.append(...SLIDES[state.slide]().filter(Boolean));
+    }
+  }
+
+  function fmt(ms) {
+    const s = Math.ceil(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  function updateTimers() {
+    const left = mainLeft();
+    const mt = $('mainTimer');
+    const ended = state.phase === 'ended' || state.phase === 'reveal';
+    mt.textContent = !ended && left <= 0 ? '時間切れ（この問題で終了）' : fmt(left);
+    mt.classList.toggle('warn', left <= 60 * 1000);
+
+    const ps = $('pickSec');
+    if (ps && state.pick) {
+      const p = state.pick;
+      const l = p.deadline ? Math.max(0, p.deadline - Date.now()) : p.pausedLeft;
+      ps.textContent = `${Math.ceil(l / 1000)}秒${p.deadline ? '' : '（停止中）'}`;
+    }
+
+    if (state.phase === 'reveal') {
+      const n = Math.floor((Date.now() - state.revealAt) / REVEAL_STEP_MS) + 1;
+      cells.forEach((el, i) => el.classList.toggle('gone', i < n));
+    }
+  }
+
+  let introKey = null;
+  function render() {
+    const intro = state.phase === 'title' || state.phase === 'rules';
+    document.body.classList.toggle('intro', intro);
+    document.body.classList.toggle('title', state.phase === 'title');
+    // 同じスライドの再描画ではアニメーションを止めない
+    const key = intro ? `${state.phase}:${state.slide}:${state.subtitle}:${state.teams.map(t => t.name).join('|')}` : null;
+    if (key !== introKey) { introKey = key; renderIntro(); }
+    renderHeader();
+    renderBoard();
+    renderTeams();
+    if (VIEW === 'operator') renderOps();
+    updateTimers();
+  }
+
+  // ---- 操作 ----
+  function onCell(i) {
+    if (VIEW !== 'operator') return;
+    if (state.phase === 'place') {
+      if (legalInfo(state.board, state.placing.team).cells.includes(i)) place(i);
+    } else if (state.phase === 'remove') {
+      const v = state.board[i];
+      if (v !== -1 && v !== state.removing.team) removePanel(i);
+    }
+  }
+
+  function tick() {
+    updateTimers();
+    if (VIEW !== 'operator') return;
+    const p = state.pick;
+    if (state.phase === 'place' && p && p.deadline && Date.now() >= p.deadline) {
+      const legal = legalInfo(state.board, state.placing.team).cells;
+      if (legal.length) place(legal[Math.floor(Math.random() * legal.length)]);
+    }
+  }
+  setInterval(tick, 100);
+
+  document.addEventListener('keydown', e => {
+    if (VIEW !== 'operator' || (e.target.closest && e.target.closest('dialog'))) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+    else if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('hideOps');
+    else if (state.phase === 'title' && e.key === 'ArrowRight') gotoSlide(0);
+    else if (state.phase === 'rules' && e.key === 'ArrowRight') gotoSlide(state.slide + 1);
+    else if (state.phase === 'rules' && e.key === 'ArrowLeft') gotoSlide(state.slide - 1);
+  });
+  $('showOps').addEventListener('click', () => document.body.classList.remove('hideOps'));
+  document.addEventListener('dblclick', () => {
+    if (VIEW === 'screen' && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  });
+
+  // 観客用画面は操作画面の変更を受け取って描画する
+  window.addEventListener('storage', e => {
+    if (e.key === KEY) { state = load() || initialState(); render(); }
+    if (e.key === PHOTO_KEY) { photoUrl = loadPhoto(); render(); }
+  });
+
+  // ---- 設定 ----
+  const dlg = $('settings');
+  function openSettings() {
+    const grid = $('nameGrid');
+    grid.textContent = '';
+    state.teams.forEach((tm, t) => {
+      grid.append(h('span', { style: `background:${COLORS[t].bg}` }, String(t + 1)),
+        h('input', { type: 'text', id: `name${t}`, value: tm.name }));
+    });
+    $('hardInput').value = state.hardSet.join(',');
+    $('subtitleInput').value = state.subtitle;
+    const pv = $('photoPreview');
+    pv.style.display = photoUrl ? 'block' : 'none';
+    if (photoUrl) pv.src = photoUrl;
+    $('photoInput').value = '';
+    dlg.showModal();
+  }
+  $('saveSettings').addEventListener('click', () => {
+    const names = state.teams.map((tm, t) => $(`name${t}`).value.trim() || `チーム${t + 1}`);
+    const hard = $('hardInput').value.split(/[,、\s]+/).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= MAX_Q && n !== ATTACK_Q);
+    const subtitle = $('subtitleInput').value.trim();
+    commit(() => {
+      names.forEach((n, t) => { state.teams[t].name = n; });
+      state.hardSet = [...new Set(hard)].sort((a, b) => a - b);
+      state.subtitle = subtitle;
+    });
+  });
+  $('photoInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    const src = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(img.width, img.height);
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 1200;
+      cv.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 1200, 1200);
+      URL.revokeObjectURL(src);
+      let q = 0.88, url;
+      do { url = cv.toDataURL('image/jpeg', q); q -= 0.1; } while (url.length > 2500000 && q > 0.3);
+      try { localStorage.setItem(PHOTO_KEY, url); }
+      catch (err) { alert('写真を保存できませんでした。小さい写真を選んでください。'); return; }
+      photoUrl = url;
+      const pv = $('photoPreview');
+      pv.src = url;
+      pv.style.display = 'block';
+      render();
+    };
+    img.onerror = () => alert('この画像は読み込めませんでした。JPEGかPNGを選んでください。');
+    img.src = src;
+  });
+  $('openScreen').addEventListener('click', () => {
+    window.open(location.pathname + '?view=screen', 'a36screen', 'popup,width=1280,height=720');
+  });
+  $('resetMain').addEventListener('click', () => {
+    state.main = { running: false, left: MAIN_MS, at: null };
+    save();
+    render();
+  });
+  $('resetGame').addEventListener('click', () => {
+    if (!confirm('盤面と得点をすべて消して最初からやり直します。よろしいですか？')) return;
+    const { teams, hardSet, subtitle } = state;
+    state = { ...initialState(), teams, hardSet, subtitle };
+    undoStack = [];
+    shown.length = 0;
+    save();
+    render();
+    dlg.close();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
